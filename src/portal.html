@@ -91,29 +91,8 @@ html,body{height:100%;font-family:'PingFang SC','Microsoft YaHei',sans-serif;fon
 <script src="./js/HMQView.js"></script>
 <!-- 5. 角色路由（最后加载，init 触发整个应用） -->
 <script src="./js/RoleRouter.js"></script>
-<!-- 6. 原有物资库数据（供 BuyerView 搜索使用） -->
-<script src="../embed-data.js"></script>
 <script>
-  // 将 ORDER_ITEMS（embed-data.js 缩写格式）转换为 DB（BuyerView 搜索所需格式）
-  if (typeof ORDER_ITEMS === 'undefined') window.ORDER_ITEMS = [];
-  if (typeof DB === 'undefined') {
-    if (typeof ORDER_ITEMS !== 'undefined' && ORDER_ITEMS.length) {
-      // ORDER_ITEMS 字段：n=名称, b=品牌, s=规格, u=单位, p=单价
-      window.DB = ORDER_ITEMS.map(function(it, idx) {
-        return {
-          code:      it.code || ('OI-' + idx),
-          name:      it.n   || '',
-          brand:     it.b   || '',
-          spec:      it.s   || '',
-          unit:      it.u   || '',
-          est_price: it.p   || 0
-        };
-      });
-    } else {
-      window.DB = [];
-    }
-  }
-  // 启动
+  // 启动（物资库数据直接走 /api/skus 查 D1，无需本地 embed-data.js）
   window.addEventListener('load', function() {
     RoleRouter.init();
   });

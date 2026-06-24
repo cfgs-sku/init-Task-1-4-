@@ -96,7 +96,23 @@ var BuyerView = (function () {
     var el = document.getElementById('bv-sku-list');
     el.innerHTML = '<div class="bv-loading">搜索中…</div>';
 
-    // 本地搜索（用原有 DB 全局变量）
+    // 优先走 API 查 D1 数据库，降级为本地 DB 搜索
+    if (typeof RoleRouter !== 'undefined') {
+      RoleRouter.fetch('/api/skus?type=library&q=' + encodeURIComponent(q) +
+                       '&project_id=' + encodeURIComponent((_user && _user.project_id) || '') +
+                       '&page_size=30')
+        .then(function(res) {
+          var list = (res.ok && res.skus) ? res.skus : [];
+          _renderSkuList(el, list, q);
+        })
+        .catch(function() { _doSearchLocal(el, q); });
+    } else {
+      _doSearchLocal(el, q);
+    }
+  }
+
+  // 降级：搜本地 DB 全局变量（兼容旧版离线数据）
+  function _doSearchLocal(el, q) {
     var results = [];
     if (typeof DB !== 'undefined' && Array.isArray(DB)) {
       var qn = q.toLowerCase();
@@ -109,19 +125,28 @@ var BuyerView = (function () {
         }
       }
     }
+    _renderSkuList(el, results, q);
+  }
 
+  function _renderSkuList(el, results, q) {
     if (!results.length) {
-      el.innerHTML = '<div class="bv-empty">未找到匹配物资<br><small>可点击下方按钮添加临时非标</small></div>';
+      el.innerHTML = '<div class="bv-empty">未找到「' + escapeHtml(q) + '」相关物资<br><small>可点击下方按钮添加临时非标</small></div>';
       return;
     }
-
     el.innerHTML = results.map(function(r) {
+      var name = r.name || r.sku_name || '';
+      var code = r.code || r.sku_code || '';
+      var spec = r.spec || '';
+      var brand = r.brand || '';
+      var unit = r.unit || '';
       return '<div class="bv-sku-row">' +
         '<div class="bv-sku-info">' +
-          '<div class="bv-sku-name">' + escapeHtml(r.name) + ' <span class="bv-sku-code">' + escapeHtml(r.code || '') + '</span></div>' +
-          '<div class="bv-sku-meta">' + escapeHtml(r.spec || '') + (r.brand ? ' · ' + escapeHtml(r.brand) : '') + ' · ' + escapeHtml(r.unit || '') + '</div>' +
+          '<div class="bv-sku-name">' + escapeHtml(name) + ' <span class="bv-sku-code">' + escapeHtml(code) + '</span></div>' +
+          '<div class="bv-sku-meta">' + escapeHtml(spec) + (brand ? ' · ' + escapeHtml(brand) : '') + (unit ? ' · ' + escapeHtml(unit) : '') + '</div>' +
         '</div>' +
-        '<button class="bv-btn bv-btn-sm bv-btn-primary" onclick="BuyerView._addToCart(' + JSON.stringify(r).replace(/"/g,'&quot;') + ')">加入购物车</button>' +
+        '<button class="bv-btn bv-btn-sm bv-btn-primary" onclick="BuyerView._addToCart(' +
+          JSON.stringify({code:code,name:name,brand:brand,spec:spec,unit:unit,est_price:r.last_price||r.est_price||0}).replace(/"/g,'&quot;') +
+        ')">加入购物车</button>' +
       '</div>';
     }).join('');
   }
