@@ -4712,13 +4712,16 @@ var DataMgr = (function(){
 // ═══════════════════════════════════════════════════════════════
 function _checkProjectSelected(){
   setTimeout(function(){
+    // 招采主管 / 管理员不需要绑定项目，跳过提示
+    var cur = typeof AuthSystem !== 'undefined' ? AuthSystem.current() : null;
+    if(cur && (cur.role === 'hmq' || cur.role === 'manager' || cur.role === 'admin')) return;
     var hasProject = (typeof PCService !== 'undefined' && PCService.getPid && PCService.getPid());
     if(!hasProject){
       if(confirm('您还未选择采购项目。\n\n请先选择或创建一个项目，否则添加到购物车的物资将不会显示在「采购中心」。\n\n是否现在选择项目？')){
         if(typeof showProjectModal === 'function') showProjectModal();
       }
     }
-  }, 400); // 延迟确保页面DOM和PCService已就绪
+  }, 400);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -4757,7 +4760,7 @@ var AuthSystem = (function(){
   var ROLE_PERMS = {
     admin:   { editDB:true,  addSKU:true,  delSKU:true,  viewLog:true,  manageUser:true,  submitDemand:true,  approveDemand:true },
     manager: { editDB:true,  addSKU:true,  delSKU:true,  viewLog:true,  manageUser:false, submitDemand:true,  approveDemand:true },
-    hmq:     { editDB:true,  addSKU:true,  delSKU:true,  viewLog:true,  manageUser:false, submitDemand:false, approveDemand:true },
+    hmq:     { editDB:true,  addSKU:true,  delSKU:true,  viewLog:true,  manageUser:false, submitDemand:true,  approveDemand:true },
     buyer:   { editDB:false, addSKU:false, delSKU:false, viewLog:false, manageUser:false, submitDemand:true,  approveDemand:false },
     viewer:  { editDB:false, addSKU:false, delSKU:false, viewLog:false, manageUser:false, submitDemand:false, approveDemand:false },
   };

@@ -158,7 +158,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
 -- ── 项目 ─────────────────────────────────────────────────────
 INSERT OR IGNORE INTO projects(id, name, code) VALUES
-  ('proj_gc',  '绿城物业项目',     'GC-001'),
+  ('proj_gc',  '雄安城服物业项目',   'GC-001'),
   ('proj_xc',  '西部城服广场项目',  'XC-002'),
   ('proj_nb',  '南滨物业项目',     'NB-003'),
   ('proj_bd',  '滨东物业项目',     'BD-004');

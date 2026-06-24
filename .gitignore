@@ -1,4 +1,5 @@
 node_modules/
 dist/embed-data.js
+embed-data.js
 .DS_Store
 *.log
