@@ -1,0 +1,1411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>城服公司物资采购管理系统 SKU25 · 2026.06.02</title>
+<!-- CDN 依赖（保持外链，不内联） -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- 模块化 CSS -->
+<link rel="stylesheet" href="./css/theme.css">
+<link rel="stylesheet" href="./css/layout.css">
+</head>
+<body>
+
+
+<div id="boot">
+  <div class="b-logo">物资采购管理系统</div>
+  <div class="b-sub">智能赋码 · 一物一码 · 规格追踪</div>
+  <div class="b-track"><div class="b-fill" id="bfill"></div></div>
+  <div class="b-msg" id="bmsg">正在初始化数据库…</div>
+</div>
+
+<div class="topbar">
+  <span class="top-logo">🏢 城服公司</span><span style="font-size:9px;color:rgba(255,255,255,.35);margin-left:4px;letter-spacing:.02em">V3.0</span>
+  <div style="width:1px;height:24px;background:rgba(255,255,255,.15);margin:0 6px"></div>
+  <!-- 核心业务 -->
+  <div class="nav-tab on" onclick="goPage('p-db')" id="tab-db">🗄 物资库</div>
+  <div class="nav-tab" onclick="goPage('p-procure')" id="tab-procure">🏗 采购中心<span id="pc-nav-b" style="display:none;background:var(--red);color:#fff;border-radius:9px;font-size:10px;padding:1px 6px;margin-left:4px;font-weight:700"></span></div>
+  <div class="nav-tab" onclick="goPage('p-demand');if(typeof DemandService!=='undefined')DemandService.onEnter();" id="tab-demand">📋 采购审核<span id="dm-nav-b" style="display:none;background:var(--blue);color:#fff;border-radius:9px;font-size:10px;padding:1px 6px;margin-left:4px;font-weight:700"></span></div>
+  <div class="nav-tab" onclick="goPage('p-review')" id="tab-review" style="display:none">🔍 审核池</div>
+  <div style="width:1px;height:24px;background:rgba(255,255,255,.15);margin:0 6px"></div>
+  <!-- 辅助功能 -->
+  <div class="nav-tab" onclick="goPage('p-history')" id="tab-history">📂 历史</div>
+  <div class="nav-tab" onclick="goPage('p-stats')" id="tab-stats">📊 统计</div>
+  <!-- 管理功能（权限控制） -->
+  
+  <div class="nav-tab" onclick="goPage('p-users')" id="tab-users" data-perm="manageUser" style="display:none">👥 账号</div>
+  <div class="nav-tab" onclick="goPage('p-audit')" id="tab-audit" data-perm="viewLog" style="display:none">📜 审计</div>
+  <!-- 右侧区域 -->
+  <span class="top-badge" id="proj-badge" onclick="showProjectModal()" style="cursor:pointer" title="点击切换/创建项目">📁 未选择项目</span>
+  <button onclick="document.getElementById('help-overlay').style.display='flex'"
+    style="background:none;border:1px solid rgba(255,255,255,.3);color:#fff;
+    border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;
+    margin-left:4px;transition:.12s;flex-shrink:0"
+    onmouseover="this.style.background='rgba(255,255,255,.15)'"
+    onmouseout="this.style.background='none'">⚙ 数据管理</button>
+  <span id="offline-badge" style="display:none;background:#f59e0b;color:#000;border-radius:20px;font-size:11px;padding:3px 9px;font-weight:700;margin-left:4px;flex-shrink:0;cursor:pointer" title="点击查看离线数据管理" onclick="document.getElementById('data-mgr-overlay').style.display='flex';DemandService.refreshOfflinePanel()">📴 离线测试模式 ▸</span>
+  <span class="top-badge" id="topbadge">初始化中…</span>
+  <span class="top-badge" style="opacity:.5;cursor:default" title="构建版本号，截图时附带此信息方便定位问题">build 2026-06-24-v1</span>
+</div>
+<div class="pages">
+
+<!-- ══════════════════════════════════
+  P1：物资数据库（默认页）
+══════════════════════════════════ -->
+<div class="page on" id="p-db">
+  <div class="db-hero">
+    <div class="db-hero-title">
+      🔍 物资搜索
+      <span style="font-size:11px;font-weight:400;color:var(--t3)">输入名称、编码或品牌关键词</span>
+    </div>
+    <div class="db-search-wrap">
+      <input class="db-search-input" id="db-inp" type="text" autocomplete="new-password"
+        placeholder="例如：灭火器、螺栓、清洁剂、CSFW-AA…"
+        oninput="dbSearch(this.value)">
+      <button class="db-search-clear" id="db-clr" onclick="clearDBSearch()">✕</button>
+    </div>
+    <div class="db-filters" id="db-filters">
+      <span class="filter-chip on" onclick="setF1(this,'')" data-v="">全部类目</span>
+      <div class="filter-sep"></div>
+      <span class="filter-chip" onclick="setF1(this,'安防')" data-v="安防">安防</span>
+      <span class="filter-chip" onclick="setF1(this,'清洁用品')" data-v="清洁用品">清洁用品</span>
+      <span class="filter-chip" onclick="setF1(this,'办公用品')" data-v="办公用品">办公用品</span>
+      <span class="filter-chip" onclick="setF1(this,'电气')" data-v="电气">电气</span>
+      <span class="filter-chip" onclick="setF1(this,'照明')" data-v="照明">照明</span>
+      <span class="filter-chip" onclick="setF1(this,'个人防护')" data-v="个人防护">个人防护</span>
+      <span class="filter-chip" onclick="setF1(this,'手工具')" data-v="手工具">手工具</span>
+      <span class="filter-chip" onclick="setF1(this,'紧固件')" data-v="紧固件">紧固件</span>
+      <span class="filter-chip" onclick="setF1(this,'泵、阀及管路')" data-v="泵、阀及管路">阀管</span>
+      <div class="filter-sep"></div>
+      <span class="filter-abc on" onclick="setFABC(this,'')" data-v="">全等级</span>
+      <span class="filter-abc" onclick="setFABC(this,'A')" data-v="A">A</span>
+      <span class="filter-abc" onclick="setFABC(this,'B')" data-v="B">B</span>
+      <span class="filter-abc" onclick="setFABC(this,'C')" data-v="C">C</span>
+      <span class="db-result-info" id="db-result-info">共 0 条</span>
+    </div>
+  </div>
+
+  <div class="db-table-wrap">
+    <table>
+      <thead><tr>
+        <th style="width:28px">#</th>
+        <th style="width:44px">图片</th>
+        <th style="width:148px">物料编码</th>
+        <th style="min-width:110px">物资名称</th>
+        <th style="width:42px">级</th>
+        <th style="width:80px">品牌</th>
+        <th style="width:80px">类目</th>
+        <th>规格型号</th>
+        <th style="width:36px">单位</th>
+        <th style="min-width:210px">平台链接</th>
+        <th style="width:140px">操作</th>
+      </tr></thead>
+      <tbody id="db-tbody"></tbody>
+    </table>
+  </div>
+  <div id="db-pager" class="dm-pager" style="padding:10px 0;display:flex;align-items:center;gap:6px;justify-content:center;flex-wrap:wrap"></div>
+
+  <div class="db-action-bar">
+    <span style="font-size:11px;color:var(--t2)">💡 点击「+ 采购清单」可将物资加入本次采购；搜索不到的新物资请前往「如何赋码」了解操作</span>
+    <div style="margin-left:auto;display:flex;gap:7px">
+      <button class="btn btn-ghost btn-sm" id="db-force-sync-btn" data-perm="editDB" style="display:none" onclick="forceSyncCloudDB()" title="清空本地缓存，强制重新从云端拉取最新数据库（解决多设备数据不一致问题）">🔄 强制同步云端最新</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportLinksTemplate()" title="导出可填写链接的模板Excel">📋 导出链接模板</button>
+      <button class="btn btn-ghost btn-sm" onclick="importLinksFromXlsx()" title="批量导入商品图片和平台链接">🔗 批量导入链接</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportDB()">⬇ 导出数据库</button>
+      <button class="btn btn-blue btn-sm" onclick="document.getElementById('fi-import-db').click()">＋ 导入更新</button>
+      <input type="file" id="fi-import-db" accept=".xlsx,.xls" style="display:none">
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  P2：如何赋码（操作引导）
+══════════════════════════════════ -->
+<div class="page" id="p-howto">
+  <div class="howto-page">
+    <div class="howto-header">
+      <h2>如何为新物资自动赋码？</h2>
+      <p>系统会按照统一规则自动生成唯一编码，你不需要手动编写任何编码，只需按以下步骤操作。</p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>先在数据库搜索，确认是否已有编码</h3>
+          <p>点击顶部「物资数据库」，在搜索框输入物资名称关键词。如果搜到了，直接点「+ 采购清单」即可，<strong>不需要赋码</strong>。</p>
+          <div class="tip">💡 <strong>模糊搜索</strong>支持：输入"灭火"可找到"灭火器""灭火器箱""手提灭火器"等所有相关物资。</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>搜不到？去「采购清单」页手动添加并自动赋码</h3>
+          <p>点击顶部「采购清单」→ 左侧搜索框输入物资名称 → 下拉没有匹配的 → 点「✦ 新增 xxx 并赋编码」。</p>
+          <div class="tip">
+            接下来填写：<br>
+            <strong>① 物资名称</strong>（已自动填入）<br>
+            <strong>② 品牌、单位、规格</strong>（选填，建议填写）<br>
+            <strong>③ 一级 → 二级 → 三级类目</strong>（必填，系统根据类目自动生成编码）<br>
+            填完点「✦ 赋新码加入清单」，编码立即生成。
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>编码格式说明（了解即可，无需手动填写）</h3>
+          <div class="code-rule">
+            CSFW - AA - 01 - 01 - 004<br>
+            <span>──── ── ── ── ───</span><br>
+            <span>前缀  大类 中类 小类 序号</span><br><br>
+            示例：CSFW-AA0101004<br>
+            <span>= 安防 / 安保设备 / 安保通讯设备 / 第4号</span>
+          </div>
+          <div class="tip" style="margin-top:8px">系统自动查找该三级类目下已有的最大序号，加1生成新编码，<strong>绝对不会重复</strong>。</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h3>有现成采购单？直接上传匹配</h3>
+          <p>点击顶部「清单匹配赋码」→ 上传 Excel 采购单 → 点「开始匹配」。系统自动：</p>
+          <div class="tip">
+            🟢 已有编码的物资 → 直接确认，同时补全规格<br>
+            🟡 名称相似的 → 高亮提示，你确认是否同一物资<br>
+            🔵 有三级类目的新物资 → 自动赋新编码<br>
+            ⚠ 无类目的 → 手动补充类目后重新处理
+          </div>
+          <button class="quick-btn" onclick="goPage('p-match')">→ 去上传采购单</button>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <h3>赋码完成后，把新记录存入数据库</h3>
+          <p>在「采购清单」页底部点「💾 存入数据库」，本次新增的物资会永久保存。下次采购直接搜索即可，不需要重复赋码。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="faq">
+      <h3>常见问题</h3>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <span>🔤</span> 不知道物资属于哪个类目怎么办？
+          <span class="faq-arrow">▶</span>
+        </div>
+        <div class="faq-a">
+          参考以下对应关系：<br>
+          • 对讲机、监控、警示牌 → <strong>安防</strong><br>
+          • 插座、开关、电缆 → <strong>电气</strong><br>
+          • 拖把、清洁剂、垃圾桶 → <strong>清洁用品</strong><br>
+          • 打印纸、文件夹、订书机 → <strong>办公用品</strong><br>
+          • 手套、安全帽、反光衣 → <strong>个人防护</strong><br>
+          • 灯具、灯泡 → <strong>照明</strong><br>
+          • 螺栓、螺丝 → <strong>紧固件</strong><br>
+          <br>不确定的，先选最接近的类目，后续可以修正。
+        </div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <span>♻️</span> 同一物资会不会生成两个编码？
+          <span class="faq-arrow">▶</span>
+        </div>
+        <div class="faq-a">
+          不会。系统每次赋码前都先在数据库里搜索：<br>
+          • 如果名称相似度 ≥90%，系统直接关联已有编码，不新建。<br>
+          • 如果你上传的采购单已有编码字段，系统直接沿用，不重复赋码。<br>
+          • 每个编码在系统里全局唯一，同一三级类目内按序号递增。
+        </div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <span>💾</span> 数据存在哪里？关掉网页会丢失吗？
+          <span class="faq-arrow">▶</span>
+        </div>
+        <div class="faq-a">
+          内置的 1978 条物资数据已编码在文件里，永久有效。<br>
+          你手动添加并「存入数据库」的记录，保存在浏览器本地存储里（localStorage），<strong>同一台电脑同一浏览器重新打开不会丢失</strong>。<br>
+          建议定期在「物资数据库」页点「导出数据库」做备份。
+        </div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <span>📤</span> 如何把新编码同步给其他同事？
+          <span class="faq-arrow">▶</span>
+        </div>
+        <div class="faq-a">
+          在「物资数据库」页点「导出数据库」，导出 Excel 后发给同事。<br>
+          同事打开自己电脑上的系统，点「+ 导入更新」选择该 Excel，即可同步所有新增编码。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  P3：采购清单
+══════════════════════════════════ -->
+<div class="page" id="p-cart">
+  <div class="cart-layout">
+    <!-- 左：搜索添加 -->
+    <div class="cart-left">
+      <div class="pane-hd">🔍 搜索添加物资</div>
+      <div class="pane-scroll" style="overflow:visible">
+        <div class="qs-box" id="qs-box">
+          <input class="qs-inp" id="qs-inp" type="text" placeholder="输入物资名称自动匹配…" autocomplete="off">
+          <button class="qs-clear" id="qs-clr" onclick="clearQS()">✕</button>
+          <div class="qs-drop" id="qs-drop"></div>
+        </div>
+
+        <div class="sel-card" id="sel-card">
+          <button class="sc-x" onclick="clearQS()">✕</button>
+          <div class="sc-name" id="sc-name"></div>
+          <div class="sc-code" id="sc-code"></div>
+          <div class="sc-meta" id="sc-meta"></div>
+          <span class="sc-edit-toggle" onclick="toggleSCExtra()">✏ 修改品牌/规格/单位</span>
+          <div class="sc-extra" id="sc-extra">
+            <div class="extra-row" style="margin-top:7px">
+              <div><div class="ex-lbl">品牌</div><input type="text" id="sc-brand"></div>
+              <div><div class="ex-lbl">单位</div><input type="text" id="sc-unit"></div>
+            </div>
+            <div><div class="ex-lbl">规格型号</div><input type="text" id="sc-spec"></div>
+          </div>
+          <div class="qty-row">
+            <span class="qty-lbl">数量</span>
+            <input type="number" class="qty-inp" id="sc-qty" value="1" min="1">
+            <button class="btn btn-dark" style="flex:1;font-size:12px" onclick="addSelToCart()">＋ 加入清单</button>
+          </div>
+        </div>
+
+        <div class="new-panel" id="new-panel">
+          <div class="new-tip">📌 库中无匹配。填写信息后系统自动赋新编码</div>
+          <div class="nf-row"><div class="nf-lbl">物资名称 *</div><input type="text" id="nf-name"></div>
+          <div class="nf-row2">
+            <div><div class="nf-lbl">品牌</div><input type="text" id="nf-brand"></div>
+            <div><div class="nf-lbl">单位</div><input type="text" id="nf-unit"></div>
+          </div>
+          <div class="nf-row"><div class="nf-lbl">规格型号</div><input type="text" id="nf-spec"></div>
+          <div class="nf-lbl">所属类目 <span style="color:var(--red)">*</span>
+            <span style="font-weight:400;color:var(--t3)">（不确定？看<span style="color:var(--blue);cursor:pointer" onclick="goPage('p-howto')">如何赋码</span>）</span>
+          </div>
+          <div class="nf-row2" style="margin-top:4px">
+            <div><div class="nf-lbl" style="color:var(--t3)">一级类目</div><select id="nf-c1" onchange="onC1()"><option value="">请选择</option></select></div>
+            <div><div class="nf-lbl" style="color:var(--t3)">二级类目</div><select id="nf-c2" onchange="onC2()"><option value="">请选择</option></select></div>
+          </div>
+          <div class="nf-row" style="margin-bottom:6px">
+            <div class="nf-lbl" style="color:var(--t3)">三级类目</div>
+            <select id="nf-c3"><option value="">请选择</option></select>
+            <div class="nf-hint">选好三级类目，系统立即生成唯一编码</div>
+          </div>
+          <div class="nf-row2">
+            <div><div class="nf-lbl">数量</div><input type="number" id="nf-qty" value="1" min="1"></div>
+            <div style="display:flex;align-items:flex-end"><button class="btn btn-blue" style="width:100%;font-size:11px" onclick="addNewToCart()">✦ 赋码并加入清单</button></div>
+          </div>
+          <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:5px" onclick="closeNewPanel()">取消</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右：清单 + 统计 -->
+    <div class="cart-right">
+      <div class="cart-stats">
+        <div class="cstat"><div class="cstat-n" style="color:var(--tx)" id="cs-total">0</div><div class="cstat-l">总种类</div></div>
+        <div class="cstat"><div class="cstat-n" style="color:var(--green)" id="cs-coded">0</div><div class="cstat-l">已有编码</div></div>
+        <div class="cstat"><div class="cstat-n" style="color:var(--blue)" id="cs-new">0</div><div class="cstat-l">新赋编码</div></div>
+        <div class="cstat"><div class="cstat-n" style="color:var(--amber)" id="cs-nocode">0</div><div class="cstat-l">待处理</div></div>
+      </div>
+      <div class="pane-hd">
+        🛒 当前采购清单
+        <span class="pane-hd-r" id="cart-cnt">0 项</span>
+      </div>
+      <div class="pane-scroll" id="cart-list">
+        <div class="empty-cart"><div class="empty-ico">🛒</div><div class="empty-txt">从左侧搜索添加物资<br>或点击数据库页条目右侧「+清单」</div></div>
+      </div>
+      <div class="pane-foot">
+        <button class="btn btn-ghost btn-sm" id="btn-clear-cart" onclick="clearCart()">清空</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('fi-cart').click()">📥 导入补充</button>
+        <input type="file" id="fi-cart" accept=".xlsx,.xls" style="display:none">
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" onclick="exportCart()">⬇ 导出采购清单</button>
+          <button class="btn btn-green btn-sm" id="btn-save-db" onclick="saveCartToDB()">💾 存入数据库</button>
+          <button class="btn btn-green btn-sm" id="btn-archive-proj" onclick="archiveCartToProject()">📁 归档到项目</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="panel" style="width:260px;border-right:none;border-left:1px solid var(--bd)">
+    <div class="pane-hd">
+      📁 <span id="proj-panel-name">未选择项目</span>
+      <button onclick="showProjectModal()" style="margin-left:auto;padding:2px 8px;font-size:10px;background:var(--blue);color:#fff;border:none;border-radius:5px;cursor:pointer">切换</button>
+    </div>
+    <div style="padding:8px 10px;border-bottom:1px solid var(--bd);font-size:11px;color:var(--t2)">
+      本项目历史采购记录，搜索时<strong style="color:var(--green)">优先推荐</strong>
+    </div>
+    <div class="pane-scroll" id="proj-orders-list">
+      <div style="padding:30px;text-align:center;color:var(--t3);font-size:12px">请先选择或创建项目</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  P4：清单匹配赋码
+══════════════════════════════════ -->
+<div class="page" id="p-match">
+  <div class="match-layout">
+    <div class="match-left">
+      <div class="pane-hd">📂 上传采购单</div>
+      <div class="drop-zone" id="dz" onclick="document.getElementById('fi-match').click()">
+        <div class="dz-ico">⬆</div>
+        <div class="dz-title">点击或拖拽 Excel</div>
+        <div class="dz-sub">支持 .xlsx / .xls<br>自动识别列名</div>
+      </div>
+      <input type="file" id="fi-match" accept=".xlsx,.xls" style="display:none">
+      <div class="match-info" id="match-info" style="display:none"></div>
+      <div style="padding:10px">
+        <button class="btn btn-dark" style="width:100%" onclick="runMatch()" id="btn-run" disabled>▶ 开始匹配赋码</button>
+      </div>
+      <div style="padding:0 10px 10px;font-size:11px;color:var(--t2);line-height:1.8">
+        <strong>匹配规则：</strong><br>
+        🟢 已有编码 → 直接确认并补全规格<br>
+        🟢 名称相似≥90% → 自动关联编码<br>
+        🟡 相似40~90% → 高亮参考<br>
+        🔵 有三级类目 → 自动赋新码<br>
+        ⚠ 无类目 → 需人工补充
+      </div>
+    </div>
+
+    <div class="match-right">
+      <div class="match-stats" id="match-stats" style="display:none">
+        <span class="mstat" style="background:var(--green-bg);color:var(--green)" id="ms-m">✓ 匹配 0</span>
+        <span class="mstat" id="ms-s">≈ 相似 0</span>
+        <span class="mstat" style="background:var(--blue-bg);color:var(--blue)" id="ms-n">✦ 新码 0</span>
+        <span class="mstat" id="ms-e">⚠ 待处理 0</span>
+      </div>
+      <div class="prog-row" id="prog-row">
+        <div class="prog-bar"><div class="prog-fill" id="prog-fill"></div></div>
+        <div class="prog-txt" id="prog-txt">0%</div>
+      </div>
+      <div class="match-toolbar" id="match-toolbar" style="display:none">
+        <div class="tabs">
+          <span class="tb on" onclick="setMT(this,'all')">全部</span>
+          <span class="tb" onclick="setMT(this,'matched')">匹配</span>
+          <span class="tb" onclick="setMT(this,'similar')">相似</span>
+          <span class="tb" onclick="setMT(this,'new')">新赋码</span>
+          <span class="tb" onclick="setMT(this,'nocat')">⚠</span>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" onclick="exportMatch()">⬇ 导出结果</button>
+          <button class="btn btn-green btn-sm" onclick="matchToCart()">→ 加入采购清单</button>
+        </div>
+      </div>
+      <div style="overflow:auto;flex:1">
+        <table>
+          <thead id="match-thead"><tr>
+            <th style="width:26px">#</th>
+            <th style="min-width:110px">物资名称</th>
+            <th style="width:148px">物料编码</th>
+            <th style="width:52px">状态</th>
+            <th style="width:78px">品牌</th>
+            <th>规格 / 相似参考</th>
+            <th style="width:68px">类目</th>
+            <th style="width:148px">操作</th>
+          </tr></thead>
+          <tbody id="match-tbody">
+            <tr><td colspan="8" style="padding:50px;text-align:center;color:var(--t3)">
+              <div style="font-size:28px;margin-bottom:8px">📋</div>
+              上传采购单后自动匹配数据库并赋码
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+  P6: 采购中心
+  ═══════════════════════════════════════════════════════════ -->
+<div class="page" id="p-procure">
+  <div class="pc-wrap">
+
+    <!-- 左侧项目栏 -->
+    <div class="pc-rail">
+      <div class="pc-rail-hd">📁 项目</div>
+      <div class="pc-rail-list" id="pc-rail-list"></div>
+      <div class="pc-rail-foot">
+        <button class="btn btn-ghost btn-sm" style="width:100%" onclick="PCService.toggleForm()">＋ 新增项目</button>
+        <div class="pc-add-form" id="pc-add-form">
+          <input type="text" id="pc-f-name" placeholder="项目名称 *">
+          <input type="text" id="pc-f-code" placeholder="项目编号（选填）">
+          <div style="display:flex;gap:5px">
+            <button class="btn btn-ghost btn-xs" style="flex:1" onclick="PCService.hideForm()">取消</button>
+            <button class="btn btn-blue btn-xs" style="flex:1" onclick="PCService.createProj()">创建</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右侧工作台 -->
+    <div class="pc-main">
+      <!-- 未选项目提示 -->
+      <div class="pc-no-proj" id="pc-no-proj">
+        <div style="font-size:36px">📁</div>
+        <div>请从左侧选择或新建项目</div>
+      </div>
+
+      <!-- 工作台（选中项目后显示）-->
+      <div class="pc-ws" id="pc-ws">
+        <!-- TAB栏 -->
+        <div class="pc-tabs">
+          <div class="pc-tab on" id="pct-sku"  onclick="PCService.tab('sku',this)">🛒 标准SKU采购</div>
+          <div class="pc-tab"    id="pct-hist" onclick="PCService.tab('hist',this)">📋 历史采购记录</div>
+          <div class="pc-tab"    id="pct-cus"  onclick="PCService.tab('cus',this)">✏ 定制采购申请</div>
+          <div class="pc-tab"    id="pct-addr" onclick="PCService.tab('addr',this)">📍 地址管理</div>
+        </div>
+
+        <!-- PANE: 标准SKU采购 -->
+        <div class="pc-pane on" id="pcp-sku">
+          <div class="pc-sku-wrap">
+            <!-- 左侧搜索区 -->
+            <div class="pc-sku-search">
+              <div class="pane-hd">🔍 搜索SKU库</div>
+              <div class="qs-box" id="pc-qs-box" style="padding:10px">
+                <input class="qs-inp" id="pc-qs-inp" type="text"
+                  placeholder="输入名称自动匹配…" autocomplete="off">
+                <button class="qs-clear" id="pc-qs-clr"
+                  onclick="PCService.clearSearch()">✕</button>
+                <div class="qs-drop" id="pc-qs-drop"></div>
+              </div>
+              <!-- 查重提示 -->
+              <div class="dup-hint" id="pc-dup-hint">
+                <div style="font-weight:700;margin-bottom:4px">⚠ 发现相似SKU，建议复用</div>
+                <div id="pc-dup-list"></div>
+              </div>
+            </div>
+
+            <!-- 右侧购物车 -->
+            <div class="pc-sku-cart">
+              <!-- 地址条 -->
+              <div class="pc-addr-bar">
+                <span style="color:var(--t3);flex-shrink:0">📍</span>
+                <span id="pc-addr-display" class="pc-addr-warn">未设置地址</span>
+                <button class="pc-btn" onclick="PCService.openAddrPick()">切换</button>
+                <button class="pc-btn" onclick="PCService.tab('addr',document.getElementById('pct-addr'))">管理</button>
+              </div>
+              <!-- 统计行 -->
+              <div class="pane-hd">
+                🛒 当前项目购物车
+                <span class="pane-hd-r" id="pc-cart-cnt">0 项</span>
+              </div>
+              <!-- 列表 -->
+              <div style="flex:1;overflow-y:auto" id="pc-cart-list">
+                <div class="empty-cart">
+                  <div class="empty-ico">🛒</div>
+                  <div class="empty-txt">从左侧搜索添加物资</div>
+                </div>
+              </div>
+              <!-- 合计 + 操作 -->
+              <div class="pc-total">
+                <span style="color:var(--t2)">💰 合计</span>
+                <span class="pc-total-amt" id="pc-total-amt">—</span>
+                <div style="margin-left:auto;display:flex;gap:6px">
+                  <button class="btn btn-ghost btn-sm" onclick="PCService.clearCart()">清空</button>
+                  <button class="btn btn-ghost btn-sm" onclick="PCService.exportXlsx()">⬇ 导出</button>
+                  <button class="btn btn-primary btn-sm" data-perm="submitDemand" onclick="DemandService.submitFromCart()" style="background:#2563EB;color:#fff;border:none;padding:5px 12px;border-radius:6px;font-weight:600">📤 提交采购申请</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANE: 历史采购记录 -->
+        <div class="pc-pane" id="pcp-hist">
+          <!-- 汇总统计条 -->
+          <div style="padding:8px 14px;border-bottom:1px solid var(--bd);background:var(--sur);
+            display:flex;gap:16px;align-items:center;flex-shrink:0;flex-wrap:wrap">
+            <span style="font-size:11px;font-weight:700;color:var(--t2)">📊 历史采购汇总</span>
+            <span id="ph-stat-items" style="font-size:11px;color:var(--t2)">—</span>
+            <span id="ph-stat-amt"   style="font-size:11px;color:var(--t2)">—</span>
+            <span id="ph-stat-cats"  style="font-size:11px;color:var(--t2)">—</span>
+            <div style="margin-left:auto;display:flex;gap:6px">
+              <input type="text" id="ph-search" placeholder="搜索物资名称/品牌/编码…"
+                style="padding:5px 10px;font-size:11px;border:1.5px solid var(--bd2);
+                  border-radius:var(--r);outline:none;width:200px"
+                oninput="PCService.histSearch(this.value)">
+              <select id="ph-cat-filter" onchange="PCService.histSearch(document.getElementById('ph-search').value)"
+                style="padding:5px 8px;font-size:11px;border:1.5px solid var(--bd2);
+                  border-radius:var(--r);outline:none;background:#fff">
+                <option value="">全部类目</option>
+              </select>
+              <button class="btn btn-ghost btn-sm" onclick="PCService.addAllHistToCart()"
+                title="将全部历史物资批量加入购物车">↓ 全部加入购物车</button>
+            </div>
+          </div>
+          <!-- 列表 -->
+          <div style="flex:1;overflow-y:auto" id="ph-list">
+            <div class="empty-cart"><div class="empty-ico">📋</div>
+              <div class="empty-txt">该项目暂无历史采购记录</div></div>
+          </div>
+        </div>
+
+        <!-- PANE: 定制采购 -->
+        <div class="pc-pane" id="pcp-cus">
+          <!-- 申请表单 -->
+          <div class="pc-cus-form">
+            <div style="font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              ✏ 新建定制采购申请
+              <span style="font-size:11px;font-weight:400;color:var(--t3)">直接采购（不入SKU库）</span>
+              <div style="margin-left:auto;display:flex;gap:6px;flex-shrink:0">
+                <button class="btn btn-ghost btn-sm" onclick="CustomService.downloadTemplate()" title="下载Excel导入模板">📥 下载导入模板</button>
+                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('cus-import-file').click()" title="批量导入定制采购申请">📤 批量导入</button>
+                <input type="file" id="cus-import-file" accept=".xlsx,.xls" style="display:none" onchange="CustomService.importBatch(this)">
+              </div>
+            </div>
+            <div class="f-grid">
+              <div>
+                <label class="f-lbl">产品名称 *</label>
+                <input class="f-inp" type="text" id="cf-name" placeholder="如：定制展架">
+              </div>
+              <div>
+                <label class="f-lbl">规格型号</label>
+                <input class="f-inp" type="text" id="cf-spec" placeholder="如：2m×1m 铝合金框">
+              </div>
+              <div>
+                <label class="f-lbl">数量</label>
+                <input class="f-inp" type="number" id="cf-qty" value="1" min="1">
+              </div>
+              <div>
+                <label class="f-lbl">单位</label>
+                <input class="f-inp" type="text" id="cf-unit" placeholder="件/套/m²">
+              </div>
+              <div>
+                <label class="f-lbl">预算金额（元）</label>
+                <input class="f-inp" type="number" id="cf-budget" placeholder="0.00" min="0">
+              </div>
+              <div>
+                <label class="f-lbl">指定供应商</label>
+                <input class="f-inp" type="text" id="cf-supplier" placeholder="选填">
+              </div>
+              <div class="f-full">
+                <label class="f-lbl">采购链接</label>
+                <input class="f-inp" type="text" id="cf-link" placeholder="电商链接（选填）">
+              </div>
+              <div class="f-full">
+                <label class="f-lbl">备注说明</label>
+                <textarea class="f-inp f-ta" id="cf-remark"
+                  placeholder="广告制作要求、活动用途、材质说明…"></textarea>
+              </div>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+              <button class="btn btn-ghost btn-sm" onclick="CustomService.reset()">重置</button>
+              <button class="btn btn-blue btn-sm" onclick="CustomService.submit()">📋 提交申请</button>
+            </div>
+          </div>
+          <!-- 已有申请列表 -->
+          <div class="pane-hd">
+            📋 本项目定制申请
+            <span class="pane-hd-r" id="pc-cus-cnt">0 项</span>
+          </div>
+          <div style="flex:1;overflow-y:auto" id="pc-cus-list">
+            <div class="empty-cart"><div class="empty-ico">✏</div>
+              <div class="empty-txt">暂无定制申请</div></div>
+          </div>
+        </div>
+
+        <!-- PANE: 地址管理 -->
+        <div class="pc-pane" id="pcp-addr">
+          <div style="padding:12px 16px;border-bottom:1px solid var(--bd);
+            display:flex;align-items:center;gap:10px;flex-shrink:0">
+            <span style="font-size:13px;font-weight:700">📍 本项目收货地址</span>
+            <button class="btn btn-blue btn-sm" onclick="PCService.showAddrEdit()">＋ 添加</button>
+          </div>
+          <div style="flex:1;overflow-y:auto;padding:12px" id="pc-addr-list">
+            <div class="empty-cart"><div class="empty-ico">📍</div>
+              <div class="empty-txt">暂无地址</div></div>
+          </div>
+        </div>
+      </div><!-- /pc-ws -->
+    </div><!-- /pc-main -->
+  </div><!-- /pc-wrap -->
+</div>
+
+
+<!-- ═══ 弹窗：地址选择 ═══ -->
+
+<!-- ══════════════════════════════════
+  需求池（阶段二新增）
+══════════════════════════════════ -->
+<div class="page" id="p-demand">
+  <div class="dm-wrap">
+    <!-- 筛选栏 -->
+    <div class="dm-filter">
+      <div class="dm-filter-tabs" id="dm-filter-tabs">
+        <span class="dm-ftab on" data-status="submitted" onclick="DemandService.filterStatus(this)">待审核</span>
+        <span class="dm-ftab" data-status="purchased" onclick="DemandService.filterStatus(this)">采购中</span>
+        <span class="dm-ftab" data-status="received" onclick="DemandService.filterStatus(this)">已收货</span>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:6px">
+          <label id="dm-select-all-wrap" style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:#64748b"><input type="checkbox" id="dm-select-all" onchange="DemandService.toggleSelectAll(this.checked)"> 全选</label> <button id="dm-batch-btn" class="btn btn-primary btn-sm" style="font-size:12px" onclick="DemandService.batchAction()">✅ 批量通过</button> <button id="dm-export-btn" class="btn btn-ghost btn-sm" style="font-size:12px" onclick="DemandService.exportByProject()">📥 按项目导出</button>
+        </div>
+      </div>
+      <div class="dm-filter-row">
+        <input type="text" id="dm-search" placeholder="搜索SKU编码/物资名称..." autocomplete="off" name="dm_s" oninput="DemandService.onSearch()" class="dm-search">
+      </div>
+    </div>
+    <!-- 需求列表 -->
+    <div id="dm-list" class="dm-list"><div class="dm-empty">暂无需求</div></div>
+    <!-- 分页 -->
+    <div id="dm-pager" class="dm-pager"></div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════
+  审核池（阶段三新增）
+══════════════════════════════════ -->
+<div class="page" id="p-review">
+  <div class="dm-wrap">
+    <div class="dm-filter">
+      <div class="dm-filter-tabs" id="rv-filter-tabs">
+        <span class="dm-ftab on" data-status="" onclick="ReviewService.filterStatus(this)">全部</span>
+        <span class="dm-ftab" data-status="pending" onclick="ReviewService.filterStatus(this)">待审核</span>
+        <span class="dm-ftab" data-status="approved" onclick="ReviewService.filterStatus(this)">已通过</span>
+        <span class="dm-ftab" data-status="rejected" onclick="ReviewService.filterStatus(this)">已驳回</span>
+      </div>
+    </div>
+    <div id="rv-list" class="dm-list"><div class="dm-empty">暂无待审核物资</div></div>
+    <div id="rv-pager" class="dm-pager"></div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════
+  账号管理（阶段四新增）
+══════════════════════════════════ -->
+<div class="page" id="p-users">
+  <div class="dm-wrap">
+    <div class="dm-filter">
+      <h3 style="margin:0;font-size:16px;color:#1e293b">👥 账号管理</h3>
+      <button class="btn btn-primary btn-sm" onclick="UserService.openCreate()" style="margin-left:auto;background:#2563EB;color:#fff;border:none;padding:6px 16px;border-radius:6px;font-weight:600">+ 新增账号</button>
+    </div>
+    <div id="us-list" class="dm-list"><div class="dm-empty">加载中...</div></div>
+  </div>
+</div>
+
+<!-- 账号编辑弹窗 -->
+<div class="m-overlay" id="us-edit-ov">
+  <div class="m-box" style="max-width:500px">
+    <div class="m-hd"><span>👥</span><h3 id="us-edit-title">新增账号</h3><button class="m-close" onclick="document.getElementById('us-edit-ov').classList.remove('open')">&#10005;</button></div>
+    <div class="m-bd" id="us-edit-body"></div>
+    <div class="m-ft" id="us-edit-ft"></div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════
+  审计日志（阶段七新增）
+══════════════════════════════════ -->
+
+<!-- ══════════════════════════════════
+  统计分析中心（阶段八新增）
+══════════════════════════════════ -->
+
+<!-- ══════════════════════════════════
+  SKU合并中心（阶段六新增）
+══════════════════════════════════ -->
+<div class="page" id="p-audit">
+  <div class="dm-wrap">
+    <div class="dm-filter">
+      <h3 style="margin:0;font-size:16px;color:#1e293b">📜 审计日志</h3>
+      <input type="text" id="audit-search-user" placeholder="按用户名筛选" style="padding:5px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;width:140px">
+      <select id="audit-filter-action" style="padding:5px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px">
+        <option value="">全部操作</option>
+        <option value="login">登录</option>
+        <option value="create_demand">创建需求</option>
+        <option value="change_demand_status">需求状态变更</option>
+        <option value="create_temp_sku">创建临时物资</option>
+        <option value="review_temp_sku">审核临时物资</option>
+        <option value="create_user">创建用户</option>
+        <option value="update_user">更新用户</option>
+        <option value="change_password">修改密码</option>
+        <option value="init_seed">系统初始化</option>
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="AuditService.loadData()" style="background:#2563EB;color:#fff;border:none;padding:5px 14px;border-radius:6px;font-size:12px">查询</button>
+    </div>
+    <div id="audit-list" class="dm-list"><div class="dm-empty">加载中...</div></div>
+    <div id="audit-pager" class="dm-pager"></div>
+  </div>
+</div>
+
+<!-- 修改密码弹窗 -->
+<div class="m-overlay" id="us-chpwd-ov">
+  <div class="m-box" style="max-width:400px">
+    <div class="m-hd"><span>🔑</span><h3>修改密码</h3><button class="m-close" onclick="document.getElementById('us-chpwd-ov').classList.remove('open')">&#10005;</button></div>
+    <div class="m-bd">
+      <div class="tmp-form-row"><label class="tmp-lbl">旧密码</label><input class="tmp-inp" id="chpwd-old" type="password"></div>
+      <div class="tmp-form-row"><label class="tmp-lbl">新密码</label><input class="tmp-inp" id="chpwd-new" type="password"></div>
+    </div>
+    <div class="m-ft">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('us-chpwd-ov').classList.remove('open')">取消</button>
+      <button class="btn btn-primary btn-sm" onclick="UserService.changePwd()">确认修改</button>
+    </div>
+  </div>
+</div>
+
+<!-- 审核详情弹窗 -->
+<div class="m-overlay" id="rv-detail-ov">
+  <div class="m-box" style="max-width:600px">
+    <div class="m-hd"><span>🔍</span><h3>临时物资审核</h3><button class="m-close" onclick="document.getElementById('rv-detail-ov').classList.remove('open')">&#10005;</button></div>
+    <div class="m-bd" id="rv-detail-body"></div>
+    <div class="m-ft" id="rv-detail-ft"></div>
+  </div>
+</div>
+
+<!-- 需求详情弹窗 -->
+<div class="m-overlay" id="dm-detail-ov">
+  <div class="m-box" style="max-width:560px">
+    <div class="m-hd"><span>📋</span><h3>需求详情</h3><button class="m-close" onclick="document.getElementById('dm-detail-ov').classList.remove('open')">&#10005;</button></div>
+    <div class="m-bd" id="dm-detail-body"></div>
+    <div class="m-ft" id="dm-detail-ft"></div>
+  </div>
+</div>
+<div class="m-overlay" id="pc-addr-pick-ov">
+  <div class="m-box" style="width:380px;max-height:80vh">
+    <div class="m-hd">
+      <span style="font-size:18px">🔀</span>
+      <h3>切换本次地址</h3>
+      <button class="m-close" onclick="PCService.closeAddrPick()">✕</button>
+    </div>
+    <div class="m-bd" id="pc-addr-pick-bd"></div>
+    <div class="m-ft">
+      <button class="btn btn-ghost btn-sm" onclick="PCService.closeAddrPick()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 弹窗：地址编辑 ═══ -->
+<div class="m-overlay" id="pc-addr-edit-ov">
+  <div class="m-box" style="width:440px;max-height:85vh">
+    <div class="m-hd">
+      <span style="font-size:18px">📍</span>
+      <h3 id="pc-ae-title">添加地址</h3>
+      <button class="m-close" onclick="PCService.closeAddrEdit()">✕</button>
+    </div>
+    <div class="m-bd">
+      <label class="f-lbl">地点名称 *</label>
+      <input class="f-inp" type="text" id="pc-ae-name" placeholder="如：西区仓库">
+      <label class="f-lbl">详细地址 *</label>
+      <input class="f-inp" type="text" id="pc-ae-addr" placeholder="省市区街道门牌号">
+      <label class="f-lbl">联系人</label>
+      <input class="f-inp" type="text" id="pc-ae-contact" placeholder="">
+      <label class="f-lbl">联系电话</label>
+      <input class="f-inp" type="text" id="pc-ae-phone" placeholder="">
+      <label class="f-lbl">收货时间要求</label>
+      <input class="f-inp" type="text" id="pc-ae-time" placeholder="如：工作日 9:00-17:00">
+      <label class="f-lbl">备注</label>
+      <input class="f-inp" type="text" id="pc-ae-note" placeholder="请提前电话联系等">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:8px;font-size:12px">
+        <input type="checkbox" id="pc-ae-def" style="width:auto"> 设为默认地址
+      </label>
+      <input type="hidden" id="pc-ae-eid">
+    </div>
+    <div class="m-ft">
+      <button class="btn btn-ghost btn-sm" onclick="PCService.closeAddrEdit()">取消</button>
+      <button class="btn btn-blue btn-sm" onclick="PCService.saveAddr()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ 弹窗：定制申请详情 ═══ -->
+<div class="m-overlay" id="cus-detail-ov">
+  <div class="m-box" style="width:480px;max-height:85vh">
+    <div class="m-hd">
+      <span style="font-size:18px">✏</span>
+      <h3 id="cus-dtl-title">定制申请详情</h3>
+      <button class="m-close" onclick="document.getElementById('cus-detail-ov').classList.remove('open')">✕</button>
+    </div>
+    <div class="m-bd" id="cus-dtl-bd"></div>
+    <div class="m-ft" id="cus-dtl-ft"></div>
+  </div>
+</div>
+
+
+<!-- ══ 新增赋码弹窗 ══ -->
+<div id="sim-modal-overlay">
+  <div class="sim-modal">
+    <div class="sim-modal-hd">
+      <span style="font-size:17px">＋</span>
+      <h3>新增赋码</h3>
+      <button onclick="closeNewCodeModal()">✕</button>
+    </div>
+    <div class="sim-modal-bd">
+      <div class="sm-item-name" id="ncm-name"></div>
+      <div class="sm-item-sub" id="ncm-brand"></div>
+      <div class="sm-lbl">选择三级类目（系统将自动生成编码）</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:6px">
+        <div>
+          <div style="font-size:10px;color:var(--t2);margin-bottom:3px">一级类目</div>
+          <select id="ncm-c1" onchange="ncmOnC1()" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid var(--bd2);border-radius:var(--r);outline:none"><option value="">请选择</option></select>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--t2);margin-bottom:3px">二级类目</div>
+          <select id="ncm-c2" onchange="ncmOnC2()" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid var(--bd2);border-radius:var(--r);outline:none"><option value="">请选择</option></select>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--t2);margin-bottom:3px">三级类目</div>
+        <select id="ncm-c3" onchange="ncmPreview()" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid var(--bd2);border-radius:var(--r);outline:none"><option value="">请选择</option></select>
+      </div>
+      <div id="ncm-preview" style="margin-top:10px;font-size:12px;font-weight:600;min-height:18px"></div>
+    </div>
+    <div class="sim-modal-ft">
+      <button class="btn btn-ghost btn-sm" onclick="closeNewCodeModal()">取消</button>
+      <button class="btn btn-blue btn-sm" onclick="doNewCodeConfirm()">✦ 生成编码并转入匹配</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+  2025-2026采购历史（多项目·多月份）
+══════════════════════════════════════════ -->
+<div class="page" id="p-history">
+  <!-- 三栏布局：项目列 | 月份列 | 订单明细 -->
+  <div style="display:flex;height:100%;overflow:hidden">
+
+    <!-- ① 项目列 -->
+    <div style="width:190px;flex-shrink:0;border-right:1px solid var(--bd);display:flex;flex-direction:column;background:var(--sur)">
+      <div class="pane-hd" style="letter-spacing:0">
+        📁 项目
+        <span class="pane-hd-cnt" id="proj-total-cnt"></span>
+      </div>
+      <div style="padding:8px">
+        <input type="text" id="proj-search" placeholder="搜索项目…"
+          style="width:100%;padding:5px 8px;font-size:11px;border:1px solid var(--bd);border-radius:var(--r);outline:none"
+          oninput="filterProjList(this.value)">
+      </div>
+      <div style="flex:1;overflow-y:auto" id="proj-list-panel"></div>
+    </div>
+
+    <!-- ② 月份列 -->
+    <div style="width:160px;flex-shrink:0;border-right:1px solid var(--bd);display:flex;flex-direction:column;background:var(--s2)">
+      <div class="pane-hd">📅 月份</div>
+      <div style="flex:1;overflow-y:auto" id="month-list-panel">
+        <div style="padding:20px;text-align:center;color:var(--t3);font-size:12px">请先选择项目</div>
+      </div>
+    </div>
+
+    <!-- ③ 订单明细 -->
+    <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+      <!-- 顶部汇总栏 -->
+      <div style="padding:8px 14px;border-bottom:1px solid var(--bd);background:var(--sur);display:flex;align-items:center;gap:14px;flex-shrink:0;flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:700" id="hist-view-title">全部记录</span>
+        <span style="font-size:11px;color:var(--t2)" id="hist-view-stat"></span>
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <input type="text" id="hist-kw" placeholder="搜名称/品牌/规格…"
+            style="width:180px;padding:5px 8px;font-size:12px;border:1px solid var(--bd2);border-radius:var(--r);outline:none"
+            oninput="renderHistDetail()">
+          <select id="hist-plat-filter" onchange="renderHistDetail()"
+            style="padding:5px 8px;font-size:12px;border:1px solid var(--bd2);border-radius:var(--r)">
+            <option value="">全部平台</option>
+            <option>得力</option><option>京东</option>
+            <option>鑫方盛</option><option>震坤行</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="exportHistView()">⬇ 导出当前视图</button>
+          <button class="btn btn-green btn-sm" onclick="exportBeautiful()">✨ 美化版报表</button>
+        </div>
+      </div>
+
+      <!-- 进度条 -->
+      <div class="prog-row" id="hist-prog-row">
+        <div class="prog-bar"><div class="prog-fill" id="hist-prog-fill"></div></div>
+        <div class="prog-txt" id="hist-prog-txt">0%</div>
+      </div>
+
+      <!-- 明细表 -->
+      <div style="flex:1;overflow:auto" id="hist-detail-wrap">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr>
+              <th style="width:26px;background:var(--s2);padding:7px 10px;border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:10;font-size:11px;color:var(--t2)">#</th>
+              <th style="background:var(--s2);padding:7px 10px;border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:10;font-size:11px;color:var(--t2);min-width:200px;max-width:280px">物资名称</th>
+              <th style="width:50px;background:var(--s2);padding:7px 10px;border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:10;font-size:11px;color:var(--t2)">平台</th>
+              <th style="width:80px;background:var(--s2);padding:7px 10px;border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:10;font-size:11px;color:var(--t2)">品牌</th>
+              <th style="background:var(--s2);padding:7px 10px;border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:10;font-size:11px;color:var(--t2);max-width:180px">规格</th>
+              <th style="width:36px;background:var(--s2);padding:7px 10px;border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:10;font-size:11px;color:var(--t2)">单位</th>
+              <th style="width:48px;background:var(--s2);padding:7px 10px;border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:10;font-size:11px;color:var(--t2);text-align:right">数量</th>
+              <th style="width:72px;background:var(--s2);padding:7px 10px;border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:10;font-size:11px;color:var(--t2);text-align:right">单价</th>
+              <th style="width:120px;background:var(--s2);padding:7px 10px;border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:10;font-size:11px;color:var(--t2)">操作</th>
+              <th style="width:52px;background:var(--s2);padding:7px 10px;border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:10;font-size:11px;color:var(--t2)">加单</th>
+            </tr>
+          </thead>
+          <tbody id="hist-detail-tbody">
+            <tr><td colspan="9" style="padding:60px;text-align:center;color:var(--t3)">
+              <div style="font-size:28px;margin-bottom:8px">📋</div>
+              从左侧选择项目，再选择月份查看采购明细
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="padding:6px 14px;border-top:1px solid var(--bd);background:var(--sur);font-size:11px;color:var(--t3);flex-shrink:0" id="hist-detail-footer"></div>
+    </div>
+
+  </div>
+</div>
+
+</div><!-- /pages -->
+
+
+<div id="img-preview-layer" onclick="this.classList.remove('on')">
+  <img id="img-preview-img" src="" alt="">
+</div>
+
+<!-- 链接/图片编辑器 -->
+<!-- SKU 编辑弹窗（管理员/招采主管：完整修改物资信息） -->
+<div id="sku-edit-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:4100;align-items:center;justify-content:center" onclick="if(event.target===this)closeSkuEditModal()">
+  <div style="background:#fff;border-radius:12px;width:460px;max-width:94vw;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:8px">
+      <span style="font-size:16px">✦</span>
+      <h3 style="font-size:15px;font-weight:700;flex:1">新增SKU并赋码</h3>
+      <button onclick="closeSkuEditModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--t3)">✕</button>
+    </div>
+    <div style="padding:16px 18px;overflow-y:auto;flex:1">
+      <div style="font-size:11px;color:var(--t3);margin-bottom:10px" id="ske-code-label">新增SKU（保存后自动生成正式编码）</div>
+
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;color:var(--t2);margin-bottom:3px">物资名称 *</div>
+        <input id="ske-name" style="width:100%;padding:7px 9px;font-size:13px;border:1px solid var(--bd2);border-radius:6px;outline:none">
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div>
+          <div style="font-size:11px;color:var(--t2);margin-bottom:3px">品牌</div>
+          <input id="ske-brand" style="width:100%;padding:7px 9px;font-size:13px;border:1px solid var(--bd2);border-radius:6px;outline:none">
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--t2);margin-bottom:3px">单位</div>
+          <input id="ske-unit" style="width:100%;padding:7px 9px;font-size:13px;border:1px solid var(--bd2);border-radius:6px;outline:none">
+        </div>
+      </div>
+
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;color:var(--t2);margin-bottom:3px">规格型号</div>
+        <input id="ske-spec" style="width:100%;padding:7px 9px;font-size:13px;border:1px solid var(--bd2);border-radius:6px;outline:none">
+      </div>
+
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;color:var(--t2);margin-bottom:3px">ABC分级</div>
+        <select id="ske-abc" style="width:100%;padding:7px 9px;font-size:13px;border:1px solid var(--bd2);border-radius:6px;outline:none">
+          <option value="A">A</option><option value="B">B</option><option value="C">C</option>
+        </select>
+      </div>
+
+      <div style="font-size:11px;color:var(--t2);margin-bottom:6px;padding-top:4px;border-top:1px solid var(--bd)">三级类目 *（用于生成正式编码）</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <div style="font-size:10px;color:var(--t2);margin-bottom:3px">一级类目</div>
+          <select id="ske-c1" onchange="skeOnC1()" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid var(--bd2);border-radius:6px;outline:none"><option value="">请选择</option></select>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--t2);margin-bottom:3px">二级类目</div>
+          <select id="ske-c2" onchange="skeOnC2()" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid var(--bd2);border-radius:6px;outline:none"><option value="">请选择</option></select>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--t2);margin-bottom:3px">三级类目</div>
+        <select id="ske-c3" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid var(--bd2);border-radius:6px;outline:none"><option value="">请选择</option></select>
+      </div>
+    </div>
+    <div style="padding:10px 18px;border-top:1px solid var(--bd);display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="closeSkuEditModal()">取消</button>
+      <button class="btn btn-blue btn-sm" onclick="saveSkuEdit()">✦ 生成编码并入库</button>
+    </div>
+  </div>
+</div>
+
+<div id="link-editor-overlay" style="display:none">
+  <div class="link-editor">
+    <div class="le-hd">
+      <span style="font-size:16px">🛒</span>
+      <div>
+        <div style="font-size:14px;font-weight:700" id="le-title">维护购买地址</div>
+        <div style="font-size:11px;color:var(--t2)" id="le-subtitle"></div>
+      </div>
+      <button onclick="closeLinkEditor()" style="margin-left:auto;background:none;border:none;font-size:18px;cursor:pointer;color:var(--t3)">✕</button>
+    </div>
+    <div class="le-body">
+      <!-- 平台链接区（主要功能，放在最前） -->
+      <div>
+        <div class="le-section">各平台购买地址</div>
+        <div style="font-size:10px;color:var(--t3);margin-bottom:8px">填写后可直接从数据库点击跳转下单，防止选错商品</div>
+        <div class="le-row">
+          <span class="le-label"><span class="plat-link pl-xfs" style="cursor:default">⭕ 鑫方盛</span></span>
+          <input class="le-input" id="le-xfs" placeholder="https://csfzshfwgs.jslink.com/...">
+          <span class="le-test-link" onclick="leTestLink('le-xfs')">测试</span>
+        </div>
+        <div class="le-row">
+          <span class="le-label"><span class="plat-link pl-dl" style="cursor:default">🔵 得力</span></span>
+          <input class="le-input" id="le-dl" placeholder="https://www.deli.com.cn/...">
+          <span class="le-test-link" onclick="leTestLink('le-dl')">测试</span>
+        </div>
+        <div class="le-row">
+          <span class="le-label"><span class="plat-link pl-zkh" style="cursor:default">🟠 震坤行</span></span>
+          <input class="le-input" id="le-zkh" placeholder="https://www.zkh.com/item/...">
+          <span class="le-test-link" onclick="leTestLink('le-zkh')">测试</span>
+        </div>
+        <div class="le-row">
+          <span class="le-label"><span class="plat-link pl-jd" style="cursor:default">🔴 京东</span></span>
+          <input class="le-input" id="le-jd" placeholder="https://item.jd.com/...">
+          <span class="le-test-link" onclick="leTestLink('le-jd')">测试</span>
+        </div>
+        <div class="le-row">
+          <span class="le-label"><span class="plat-link pl-tb" style="cursor:default">🟣 淘宝</span></span>
+          <input class="le-input" id="le-tb" placeholder="https://item.taobao.com/...">
+          <span class="le-test-link" onclick="leTestLink('le-tb')">测试</span>
+        </div>
+      </div>
+      <!-- 图片区（次要功能，折叠显示） -->
+      <div style="margin-top:14px;border-top:1px solid var(--bd);padding-top:10px">
+        <div onclick="toggleLeImgSection()" style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t3);user-select:none">
+          <span id="le-img-toggle-ico">▸</span> 商品图片（可选，点击展开）
+        </div>
+        <div id="le-img-section" style="display:none;margin-top:10px">
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <div style="flex-shrink:0">
+              <img id="le-img-preview" src="" style="display:none;width:100px;height:100px;border-radius:8px;object-fit:cover;border:1px solid var(--bd);cursor:zoom-in;margin-bottom:6px" onclick="previewImg(this.src)">
+              <div id="le-img-hint" style="display:none;font-size:10px;line-height:1.5;padding:5px 7px;border-radius:5px;border:1px solid;margin-top:4px;max-width:108px;word-break:break-word;white-space:normal"></div>
+              <div id="le-img-placeholder" style="width:100px;height:100px;border-radius:8px;border:2px dashed var(--bd2);display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--t3);font-size:12px;gap:4px">
+                <span style="font-size:24px">📷</span>无图片
+              </div>
+            </div>
+            <div style="flex:1">
+              <div class="le-section" style="margin-bottom:4px">图片地址（URL）</div>
+              <div style="display:flex;gap:6px;margin-bottom:6px">
+                <input class="le-input" id="le-img-url" placeholder="粘贴图片链接，或点下方「自动搜图」" oninput="lePreviewImg(this.value)">
+                <button class="btn btn-ghost btn-xs" onclick="lePreviewImg(document.getElementById('le-img-url').value)">预览</button>
+              </div>
+              <button class="btn btn-blue btn-sm" style="width:100%;font-size:11px" onclick="leAutoSearch()">
+                🔍 自动搜图（AI联网搜索候选图）
+              </button>
+            </div>
+          </div>
+          <!-- 候选图结果区 -->
+          <div id="le-img-candidates" style="display:none;margin-top:10px">
+            <div style="font-size:11px;color:var(--t2);margin-bottom:6px;display:flex;align-items:center;gap:8px">
+              <span id="le-cand-label">候选图片（点击选用）</span>
+              <span id="le-search-kw" style="font-size:10px;color:var(--t3)"></span>
+              <span id="le-cand-spinner" style="display:none">
+                <span style="display:inline-block;width:14px;height:14px;border:2px solid var(--bd);border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite"></span>
+                搜索中…
+              </span>
+            </div>
+            <div id="le-cand-grid" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="le-ft">
+      <button class="btn btn-ghost btn-sm" onclick="closeLinkEditor()">取消</button>
+      <button class="btn btn-dark btn-sm" onclick="saveLinkEditor()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+
+<div id="spec-popup">
+  <div class="sp-title">✏ 编辑规格型号</div>
+  <div class="sp-name" id="sp-item-name"></div>
+  <div class="sp-row">
+    <input type="text" id="sp-spec" placeholder="规格型号，如：4K 60Hz / 1.5m / 304不锈钢">
+  </div>
+  <div class="sp-row">
+    <input type="text" id="sp-brand" placeholder="品牌（可选）">
+    <input type="text" id="sp-unit" placeholder="单位" style="width:80px;flex:none">
+  </div>
+  <div class="sp-btns">
+    <button class="btn btn-ghost btn-sm" onclick="closeSpecPopup()">取消</button>
+    <button class="btn btn-dark btn-sm" onclick="saveSpec()">💾 保存</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+  临时物资 — 创建弹窗
+══════════════════════════════════════ -->
+<div id="tmp-modal-overlay" onclick="if(event.target===this)TempSKU.closeModal()">
+  <div class="tmp-modal">
+    <div class="tmp-modal-hd">
+      <span style="font-size:18px">🟡</span>
+      <h3>创建临时物资</h3>
+      <span class="tmp-badge">TMP</span>
+      <button class="m-close" onclick="TempSKU.closeModal()">✕</button>
+    </div>
+    <div class="tmp-modal-bd">
+      <div style="padding:8px 10px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:4px;font-size:11px;color:var(--amber);margin-bottom:14px;line-height:1.6">
+        ⚠ 临时物资仅用于本次下单，招采部后续将对其进行标准化处理。
+      </div>
+      <div class="tmp-form-row">
+        <label class="tmp-lbl">物资名称<span class="req">*</span></label>
+        <input class="tmp-inp" id="tmp-name" type="text" placeholder="如：电梯门禁控制器">
+      </div>
+      <div class="tmp-form-row2">
+        <div>
+          <label class="tmp-lbl">规格型号<span class="req">*</span></label>
+          <input class="tmp-inp" id="tmp-spec" type="text" placeholder="如：XK300型">
+        </div>
+        <div>
+          <label class="tmp-lbl">单位<span class="req">*</span></label>
+          <input class="tmp-inp" id="tmp-unit" type="text" placeholder="如：台/个/套">
+        </div>
+      </div>
+      <div class="tmp-form-row">
+        <label class="tmp-lbl">采购数量<span class="req">*</span></label>
+        <input class="tmp-inp" id="tmp-qty" type="number" value="1" min="1" style="width:120px">
+      </div>
+      <div class="tmp-form-row" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 12px;margin-bottom:4px">
+        <label class="tmp-lbl" style="color:#0369a1">🔗 商品链接自动解析</label>
+        <div style="display:flex;gap:6px">
+          <input class="tmp-inp" id="tmp-url-parse" type="text" placeholder="粘贴京东/震坤行商品链接，自动解析商品信息" style="flex:1;border-color:#7dd3fc">
+          <button class="btn btn-sm" style="background:#0284c7;color:#fff;border:none;padding:4px 14px;border-radius:6px;font-weight:600;white-space:nowrap" onclick="URLGateway.parse()">🔍 解析</button>
+        </div>
+        <div id="tmp-url-status" style="font-size:11px;color:#0369a1;margin-top:4px;display:none"></div>
+<div id="tmp-manual-url-fallback" style="display:none;margin-top:8px;padding:8px;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;font-size:12px"><div style="color:#92400e;margin-bottom:6px">⚠️ 自动解析失败，请手动粘贴原始商品页 URL：</div><div style="display:flex;gap:6px"><input id="tmp-manual-url-input" class="tmp-inp" type="text" placeholder="粘贴完整商品页面 URL" style="flex:1;font-size:12px"><button class="btn btn-sm" style="background:#d97706;color:#fff;border:none;padding:4px 12px;border-radius:6px;font-size:12px;white-space:nowrap" onclick="(function(){var u=document.getElementById('tmp-manual-url-input').value.trim();if(u){document.getElementById('tmp-url-parse').value=u;URLGateway.parse();}})()">重试解析</button></div></div>
+      </div>
+      <div class="tmp-form-row2">
+        <div>
+          <label class="tmp-lbl">品牌（选填）</label>
+          <input class="tmp-inp" id="tmp-brand" type="text" placeholder="如：得力">
+        </div>
+        <div>
+          <label class="tmp-lbl">采购链接（选填）</label>
+          <input class="tmp-inp" id="tmp-link" type="text" placeholder="如：https://item.jd.com/xxx">
+        </div>
+      </div>
+      <div class="tmp-form-row">
+        <label class="tmp-lbl">图片链接（选填）</label>
+        <input class="tmp-inp" id="tmp-img" type="text" placeholder="商品图片URL">
+        <div id="tmp-img-preview" style="margin-top:6px;display:none"><img id="tmp-img-prev-el" style="max-width:120px;max-height:80px;border-radius:6px;border:1px solid #e2e8f0"></div>
+      </div>
+      <div class="tmp-form-row">
+        <label class="tmp-lbl">备注（选填）</label>
+        <input class="tmp-inp" id="tmp-remark" type="text" placeholder="品牌要求、用途说明等">
+      </div>
+      <div class="tmp-code-preview">
+        <span>📋 将生成临时编码：</span>
+        <strong id="tmp-code-preview-val">TMP-000001</strong>
+        <span style="color:var(--t3);font-size:10px">（自动递增，全局唯一）</span>
+      </div>
+    </div>
+    <div class="tmp-modal-ft">
+      <button class="btn btn-ghost btn-sm" onclick="TempSKU.closeModal()">取消</button>
+      <button class="btn btn-sm" style="background:var(--amber);color:#fff" onclick="TempSKU.submit()">🟡 创建并加入购物车</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 数据管理弹窗 ══ -->
+<div id="data-mgr-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9100;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+  <div class="m-box" style="width:560px;max-width:95vw">
+    <div class="m-hd">
+      <span style="font-size:20px">⚙</span>
+      <h3 style="font-size:15px">数据管理</h3>
+      <button class="m-close" onclick="document.getElementById('data-mgr-overlay').style.display='none'">✕</button>
+    </div>
+    <div class="m-bd" style="padding:0">
+
+      <!-- ⑥ Cloudflare Worker 云同步（右下角「☁」按钮）-->
+      <div style="padding:14px 18px;border-bottom:1px solid var(--bd);background:linear-gradient(135deg,#f0f7ff,#ebf3fc)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:18px">☁</span>
+          <span style="font-size:12px;font-weight:700;color:#1A5FA8;letter-spacing:.04em">Cloudflare Worker 云同步</span>
+          <span style="width:8px;height:8px;border-radius:50%;background:#4CAF50;flex-shrink:0"></span>
+          <span style="font-size:10px;color:#4CAF50;font-weight:600">已启用</span>
+        </div>
+        <div style="font-size:11px;color:var(--t3);line-height:1.8">
+          云同步已升级为 <strong>Cloudflare Worker</strong> 方案。<br>
+          请使用页面<strong>右下角「☁」蓝色按钮</strong>进行同步操作。<br>
+          支持：立即同步 / 全量拉取 / 连接测试 / 暂停同步
+        </div>
+      </div>
+
+
+      <!-- ① 采购员/主管：导出给管理员 — 已由云同步替代，隐藏 -->
+      <!-- ② 管理员：合并贡献 — 已由云同步替代，隐藏 -->
+      <!-- ③ 管理员下发SKU — 已由云同步替代，隐藏 -->
+      <!-- ④ 采购员导入SKU — 已由云同步替代，隐藏 -->
+
+      <!-- 云同步说明 -->
+      <div style="padding:14px 18px;border-bottom:1px solid var(--bd);background:#F0F7FF">
+        <div style="font-size:11px;font-weight:700;color:#1A5FA8;letter-spacing:.04em;margin-bottom:6px">
+          ☁ SKU 库同步说明
+        </div>
+        <div style="font-size:11px;color:var(--t3);line-height:1.9">
+          SKU库已通过 <strong>Cloudflare Worker</strong> 自动云端同步。<br>
+          无需手动导入导出，所有采购员实时共享同一份数据。<br>
+          如需手动触发同步，请使用页面<strong>右下角「☁」按钮</strong>。
+        </div>
+      </div>
+
+      <!-- ⑥ 离线采购申请数据管理 -->
+      <div id="offline-demand-mgr" style="padding:14px 18px;border-bottom:1px solid var(--bd);display:none">
+        <div style="font-size:11px;font-weight:700;color:#d97706;letter-spacing:.04em;margin-bottom:6px">
+          📴 离线测试数据管理（云端不可达时显示）
+        </div>
+        <div style="font-size:11px;color:var(--t3);margin-bottom:8px;line-height:1.7">
+          当前采购申请数据暂存在本地浏览器。上线部署后，可将离线数据导出再手动录入云端，或直接清空重新提交。
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="DemandService._exportOffline()">⬇ 导出离线申请数据</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="DemandService._clearOffline()">🗑 清空离线数据</button>
+        </div>
+        <div id="offline-demand-stat" style="font-size:11px;color:var(--t3);margin-top:6px"></div>
+      </div>
+
+      <!-- 采购审核操作历史查询（追溯某条记录是否本机处理过） -->
+      <div style="padding:14px 18px;border-bottom:1px solid var(--bd)">
+        <div style="font-size:11px;font-weight:700;color:var(--t2);letter-spacing:.04em;margin-bottom:8px">
+          🔍 采购审核操作历史（追溯某记录是否处理过）
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input type="text" id="oplog-search-input" placeholder="输入需求单号或记录ID" style="flex:1;min-width:160px;padding:5px 10px;border:1px solid var(--bd);border-radius:6px;font-size:12px">
+          <button class="btn btn-ghost btn-sm" onclick="DemandService._uiCheckHistory()">查询</button>
+          <button class="btn btn-ghost btn-sm" onclick="DemandService._uiViewAllHistory()">查看全部记录</button>
+        </div>
+        <div id="oplog-result" style="font-size:11px;color:var(--t3);margin-top:8px;max-height:160px;overflow-y:auto;line-height:1.8"></div>
+      </div>
+
+      <!-- ⑤ 个人数据备份 -->
+      <div style="padding:14px 18px">
+        <div style="font-size:11px;font-weight:700;color:var(--t2);letter-spacing:.04em;margin-bottom:8px">
+          💾 个人数据备份（换电脑/清缓存前）
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="DataMgr.exportMyData()">⬇ 导出个人备份</button>
+          <button class="btn btn-ghost btn-sm" onclick="DataMgr.importMyData()">⬆ 恢复个人备份</button>
+          <input type="file" id="dm-my-file" accept=".json" style="display:none"
+            onchange="DataMgr.doImportMyData(this)">
+        </div>
+        <div style="font-size:11px;color:var(--t3);margin-top:6px;line-height:1.7">
+          换电脑或清除浏览器缓存前，先导出个人备份；新设备上恢复即可。
+        </div>
+      </div>
+    </div>
+    <div class="m-ft" style="justify-content:space-between;align-items:center">
+      <span id="dm-status" style="font-size:11px;color:var(--green);font-weight:600"></span>
+      <button class="btn btn-ghost btn-sm"
+        onclick="document.getElementById('data-mgr-overlay').style.display='none'">关闭</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ 使用说明弹窗 ══ -->
+<div id="help-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+  <div class="m-box" style="width:680px;max-width:95vw;max-height:88vh">
+    <div class="m-hd">
+      <span style="font-size:20px">❓</span>
+      <h3 style="font-size:15px">系统使用说明 · 采购中心</h3>
+      <button class="m-close" onclick="document.getElementById('help-overlay').style.display='none'">✕</button>
+    </div>
+    <div class="m-bd" style="font-size:13px;line-height:1.9;color:var(--tx)">
+
+      <!-- 整体流程 -->
+      <div style="background:var(--blue-bg);border:1px solid var(--blue-lt);border-radius:var(--r);padding:12px 14px;margin-bottom:16px">
+        <div style="font-weight:700;color:var(--blue);margin-bottom:6px;font-size:14px">📋 完整采购流程（4步）</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px">
+          <span style="background:var(--blue);color:#fff;padding:3px 10px;border-radius:12px;font-weight:700">① 选项目</span>
+          <span style="color:var(--t3)">→</span>
+          <span style="background:var(--blue);color:#fff;padding:3px 10px;border-radius:12px;font-weight:700">② 加入购物车</span>
+          <span style="color:var(--t3)">→</span>
+          <span style="background:var(--blue);color:#fff;padding:3px 10px;border-radius:12px;font-weight:700">③ 导出清单</span>
+          <span style="color:var(--t3)">→</span>
+          
+        </div>
+      </div>
+
+      <!-- 采购中心说明 -->
+      <div style="margin-bottom:16px">
+        <div style="font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+          <span style="background:var(--green);color:#fff;padding:2px 8px;border-radius:8px;font-size:11px">采购中心</span>
+          准备阶段 — 选物资、填数量、填单价
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <tr style="background:var(--s2)">
+            <th style="padding:6px 10px;text-align:left;border:1px solid var(--bd);font-weight:700">功能</th>
+            <th style="padding:6px 10px;text-align:left;border:1px solid var(--bd);font-weight:700">说明</th>
+          </tr>
+          <tr>
+            <td style="padding:6px 10px;border:1px solid var(--bd);white-space:nowrap">左侧项目栏</td>
+            <td style="padding:6px 10px;border:1px solid var(--bd)">每个采购项目独立空间，互不干扰。历史采购项目已内置，可直接切换</td>
+          </tr>
+          <tr style="background:var(--s2)">
+            <td style="padding:6px 10px;border:1px solid var(--bd);white-space:nowrap">标准SKU采购</td>
+            <td style="padding:6px 10px;border:1px solid var(--bd)">从3328条SKU库搜索物资 → 加入购物车 → 填数量和单价</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 10px;border:1px solid var(--bd);white-space:nowrap">历史采购记录</td>
+            <td style="padding:6px 10px;border:1px solid var(--bd)">查看该项目过去的采购清单，可整条/整类/全部加入购物车</td>
+          </tr>
+          <tr style="background:var(--s2)">
+            <td style="padding:6px 10px;border:1px solid var(--bd);white-space:nowrap">定制采购申请</td>
+            <td style="padding:6px 10px;border:1px solid var(--bd)">广告制作/活动物资等非标品，不进SKU库，直接采购</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 10px;border:1px solid var(--bd);white-space:nowrap">地址管理</td>
+            <td style="padding:6px 10px;border:1px solid var(--bd)">每个项目可设多个收货地址，导出清单时自动带入</td>
+          </tr>
+          <tr style="background:var(--s2)"><td style="padding:6px 10px;border:1px solid var(--bd);white-space:nowrap;font-weight:700;color:var(--green)">⬇ 导出清单</td><td style="padding:6px 10px;border:1px solid var(--bd)">将购物车导出为 Excel，用于联系供应商下单</td></tr>
+        </table>
+      </div>
+
+      <!-- 购物车操作说明 -->
+      <div style="background:#FEF6E2;border:1px solid var(--amber-bd);border-radius:var(--r);padding:10px 14px">
+        <div style="font-weight:700;margin-bottom:6px">💡 购物车数量修改方法</div>
+        <ul style="margin:0;padding-left:16px;font-size:12px;line-height:2">
+          <li>点 <strong>−</strong> 或 <strong>＋</strong> 按钮：立即减1/加1</li>
+          <li>直接点击数字框输入 → 输完后按 <kbd style="background:#fff;border:1px solid #ccc;border-radius:3px;padding:1px 5px;font-size:11px">Enter</kbd> 或点击其他区域确认</li>
+          <li>单价填写后失焦（点其他地方）自动计算小计</li>
+        </ul>
+      </div>
+
+    </div>
+    <div class="m-ft">
+      <button class="btn btn-blue btn-sm" onclick="document.getElementById('help-overlay').style.display='none'">我知道了</button>
+    </div>
+  </div>
+</div>
+
+
+
+
+<!-- ════════════════════════════════
+     脚本加载（严格按依赖顺序）
+     开发：修改各 src/js/*.js 文件
+     生产：npm run build → dist/index.html
+════════════════════════════════ -->
+<script src="./js/utils.js"></script>
+<script src="./js/db.js"></script>
+<script src="./js/ApiService.js"></script>
+<!-- 历史订单外置数据（与 index.html 同目录部署） -->
+<script src="../embed-data.js"></script>
+<script>
+// 兜底：embed-data.js 未加载时给空默认值，避免引用报错
+if(typeof ORDER_ITEMS==='undefined') window.ORDER_ITEMS=[];
+if(typeof ORDER_PATCHES==='undefined') window.ORDER_PATCHES={};
+if(typeof PRESET_ORDERS==='undefined') window.PRESET_ORDERS={};
+</script>
+<script src="./js/ProjectService.js"></script>
+<script src="./js/SKUService.js"></script>
+<script src="./js/PCService.js"></script>
+<script src="./js/AuthSystem.js"></script>
+<script src="./js/DemandService.js"></script>
+<script src="./js/main.js"></script>
+</body>
+</html>

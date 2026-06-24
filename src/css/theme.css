@@ -1,0 +1,17 @@
+/* ══════════════════════════════════
+   theme.css — CSS 变量 & 基础重置
+   城服公司物资采购管理系统
+══════════════════════════════════ */
+:root{
+  --bg:#F4F3F0;--sur:#FFF;--s2:#EFEEE9;--s3:#E5E3DC;
+  --bd:#DEDAD2;--bd2:#C0BAB0;
+  --tx:#1A1916;--t2:#68655F;--t3:#9E9B96;
+  --blue:#1A5FA8;--blue-bg:#EBF3FC;--blue-lt:#C8DFF8;
+  --green:#267339;--green-bg:#E8F5EB;--green-bd:#A0D4AC;
+  --amber:#7A5200;--amber-bg:#FEF6E2;--amber-bd:#EAC860;
+  --red:#9E251C;--red-bg:#FEF0EE;
+  --r:8px;--rl:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--tx);font-family:'PingFang SC','Microsoft YaHei',sans-serif;font-size:13px;display:flex;flex-direction:column;height:100vh;overflow:hidden}

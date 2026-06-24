@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>城服物资采购系统 · 多项目协同版</title>
+<style>
+/* ── 全局重置 */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'PingFang SC','Microsoft YaHei',sans-serif;font-size:13px;background:#f1f5f9;color:#0f172a}
+
+/* ── 顶部导航栏 */
+#rr-navbar{
+  display:none;
+  position:fixed;top:0;left:0;right:0;height:52px;
+  background:#0f172a;color:#f1f5f9;
+  padding:0 20px;
+  align-items:center;justify-content:space-between;
+  z-index:8000;gap:12px;
+}
+.rr-nav-left{display:flex;align-items:center;gap:10px}
+.rr-nav-title{font-weight:700;font-size:14px}
+.rr-nav-role{padding:2px 8px;border-radius:4px;font-size:12px;font-weight:700}
+.rr-role-hmq  {background:#7c3aed;color:#fff}
+.rr-role-buyer{background:#0284c7;color:#fff}
+.rr-nav-proj{font-size:12px;color:#94a3b8}
+.rr-nav-right{display:flex;align-items:center;gap:10px}
+.rr-nav-user{font-size:13px;color:#94a3b8}
+.rr-nav-logout{
+  padding:4px 12px;border-radius:5px;border:1px solid #334155;
+  background:transparent;color:#94a3b8;font-size:12px;cursor:pointer;
+}
+.rr-nav-logout:hover{background:#334155;color:#f1f5f9}
+
+/* ── 主内容区 */
+#rr-app{
+  padding-top:52px; /* 留出 navbar 高度 */
+  min-height:100vh;
+}
+
+/* ── 登录页 */
+.rr-login-wrap{
+  display:flex;align-items:center;justify-content:center;
+  min-height:100vh;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);
+}
+.rr-login-box{
+  width:360px;background:#fff;border-radius:14px;
+  padding:36px 32px;box-shadow:0 20px 60px rgba(0,0,0,.3);
+}
+.rr-login-logo{font-size:18px;font-weight:800;color:#0f172a;margin-bottom:4px;text-align:center}
+.rr-login-sub{font-size:12px;color:#94a3b8;text-align:center;margin-bottom:24px}
+.rr-login-err{
+  background:#FEF0EE;color:#9E251C;border:1px solid #FECACA;
+  padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:14px;
+}
+.rr-login-field{margin-bottom:14px}
+.rr-login-field label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:5px}
+.rr-login-field input{
+  width:100%;padding:9px 12px;border:1px solid #e2e8f0;border-radius:7px;
+  font-size:14px;outline:none;transition:.15s;
+}
+.rr-login-field input:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+.rr-login-submit{
+  width:100%;padding:11px;background:#2563eb;color:#fff;border:none;
+  border-radius:7px;font-size:14px;font-weight:700;cursor:pointer;
+  margin-top:6px;transition:.12s;
+}
+.rr-login-submit:hover{background:#1d4ed8}
+.rr-login-submit:disabled{opacity:.6;cursor:not-allowed}
+.rr-login-hint{font-size:11px;color:#94a3b8;text-align:center;margin-top:14px}
+</style>
+</head>
+<body>
+
+<!-- 顶部导航栏（登录后显示） -->
+<nav id="rr-navbar"></nav>
+
+<!-- 应用挂载点 -->
+<div id="rr-app">
+  <div style="padding:60px;text-align:center;color:#94a3b8">正在初始化…</div>
+</div>
+
+<!-- ══ 脚本加载（依赖顺序） ══ -->
+<!-- 1. 全局工具（escapeHtml / syncLock） -->
+<script src="./js/utils.js"></script>
+<!-- 2. 订单状态标签组件 -->
+<script src="./js/OrderStatusTag.js"></script>
+<!-- 3. 采购员端视图 -->
+<script src="./js/BuyerView.js"></script>
+<!-- 4. 招采部端视图 -->
+<script src="./js/HMQView.js"></script>
+<!-- 5. 角色路由（最后加载，init 触发整个应用） -->
+<script src="./js/RoleRouter.js"></script>
+<!-- 6. 原有物资库数据（供 BuyerView 搜索使用） -->
+<script src="../embed-data.js"></script>
+<script>
+  // 原有 DB 全局变量兜底（embed-data.js 不含时使用空数组）
+  if (typeof DB === 'undefined') window.DB = [];
+  if (typeof ORDER_ITEMS === 'undefined') window.ORDER_ITEMS = [];
+  // 启动
+  window.addEventListener('load', function() {
+    RoleRouter.init();
+  });
+</script>
+</body>
+</html>
