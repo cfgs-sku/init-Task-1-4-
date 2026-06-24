@@ -7,8 +7,12 @@
     "extract": "node scripts/extract.js",
     "patch": "node scripts/apply-tasks.js",
     "dev": "node scripts/dev-server.js",
-    "build": "node scripts/build-single.js",
-    "preview": "node scripts/preview-server.js"
+    "build": "node scripts/build-single.js && node scripts/build-portal.js",
+    "build:portal": "node scripts/build-portal.js",
+    "preview": "node scripts/preview-server.js",
+    "import:skus": "node scripts/import-skus-to-d1.js",
+    "import:skus:apply": "node scripts/import-skus-to-d1.js --apply",
+    "deploy": "npm run build && wrangler pages deploy dist"
   },
   "devDependencies": {
     "vite": "^5.4.0"

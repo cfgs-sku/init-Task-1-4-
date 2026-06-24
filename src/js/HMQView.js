@@ -110,30 +110,65 @@ var HMQView = (function () {
   function _ordersHTML() {
     if (!_orders.length) return '<div class="hmq-empty">暂无订单</div>';
     return '<div class="hmq-card-list">' + _orders.map(function(ord) {
-      var actions = OrderStatusTag.getActions(ord.status, 'hmq');
-      var tempCount = (ord.items || []).filter(function(it){ return it.is_temp; }).length;
+      var actions   = OrderStatusTag.getActions(ord.status, 'hmq');
+      var items     = ord.items || [];
+      var tempCount = items.filter(function(it){ return it.is_temp; }).length;
+      var total     = items.reduce(function(s, it){
+        return s + (parseFloat(it.est_price) || 0) * (parseInt(it.qty) || 1);
+      }, 0);
+
       return '<div class="hmq-card">' +
+        // ── 卡片头 ──
         '<div class="hmq-card-hd">' +
           '<span class="hmq-card-proj">📁 ' + escapeHtml(ord.project_name || '') + '</span>' +
           OrderStatusTag.render(ord.status) +
           (tempCount ? '<span class="hmq-temp-hint">含 ' + tempCount + ' 项临时非标</span>' : '') +
+          '<span class="hmq-card-total">合计 ¥' + total.toFixed(2) + '</span>' +
         '</div>' +
+        // ── 元信息 ──
         '<div class="hmq-card-meta">' +
-          '<span>📋 ' + escapeHtml(ord.id) + '</span>' +
+          '<span>📋 <code>' + escapeHtml(ord.id) + '</code></span>' +
           '<span>👤 ' + escapeHtml(ord.submitter_name || '') + '</span>' +
-          '<span>🕐 ' + ord.created_at + '</span>' +
-          (ord.reject_reason ? '<span class="hmq-reject">驳回：' + escapeHtml(ord.reject_reason) + '</span>' : '') +
+          '<span>🕐 ' + (ord.created_at || '').replace('T',' ').slice(0,16) + '</span>' +
+          (ord.remark ? '<span>💬 ' + escapeHtml(ord.remark) + '</span>' : '') +
+          (ord.reject_reason ? '<span class="hmq-reject">驳回原因：' + escapeHtml(ord.reject_reason) + '</span>' : '') +
         '</div>' +
-        '<div class="hmq-card-items">' +
-          (ord.items || []).map(function(it) {
-            return '<span class="hmq-item-pill">' +
-              escapeHtml(it.sku_name) + ' ×' + it.qty + ' ' + escapeHtml(it.unit || '') +
-              (it.est_price ? '（¥' + parseFloat(it.est_price).toFixed(2) + '）' : '') +
-              OrderStatusTag.tempBadge(it.is_temp) +
-            '</span>';
-          }).join('') +
+        // ── 明细表格 ──
+        '<div class="hmq-items-wrap">' +
+          '<table class="hmq-items-table">' +
+            '<thead><tr>' +
+              '<th>#</th><th>物资名称</th><th>规格</th><th>品牌</th>' +
+              '<th>单位</th><th>数量</th><th>单价(¥)</th><th>小计(¥)</th><th>采购链接</th><th>标识</th>' +
+            '</tr></thead>' +
+            '<tbody>' +
+            items.map(function(it, i) {
+              var price = parseFloat(it.est_price) || 0;
+              var qty   = parseInt(it.qty) || 1;
+              var url   = it.purchase_url || '';
+              return '<tr' + (it.is_temp ? ' class="hmq-row-temp"' : '') + '>' +
+                '<td>' + (i + 1) + '</td>' +
+                '<td class="hmq-td-name"><strong>' + escapeHtml(it.sku_name || '') + '</strong>' +
+                  (it.sku_code ? '<br><span class="hmq-sku-code">' + escapeHtml(it.sku_code) + '</span>' : '') +
+                '</td>' +
+                '<td>' + escapeHtml(it.spec  || '—') + '</td>' +
+                '<td>' + escapeHtml(it.brand || '—') + '</td>' +
+                '<td>' + escapeHtml(it.unit  || '—') + '</td>' +
+                '<td class="hmq-td-num">' + qty + '</td>' +
+                '<td class="hmq-td-num">' + (price ? price.toFixed(2) : '—') + '</td>' +
+                '<td class="hmq-td-num hmq-td-sub">' + (price ? (price * qty).toFixed(2) : '—') + '</td>' +
+                '<td>' + (url ? '<a href="' + escapeHtml(url) + '" target="_blank" class="hmq-buy-link">🛒 购买</a>' : '—') + '</td>' +
+                '<td>' + OrderStatusTag.tempBadge(it.is_temp) + '</td>' +
+              '</tr>';
+            }).join('') +
+            '</tbody>' +
+            '<tfoot><tr>' +
+              '<td colspan="8" class="hmq-tfoot-label">合计</td>' +
+              '<td class="hmq-td-num hmq-tfoot-total">¥' + total.toFixed(2) + '</td>' +
+              '<td></td>' +
+            '</tr></tfoot>' +
+          '</table>' +
         '</div>' +
-        (ord.remark ? '<div class="hmq-remark">备注：' + escapeHtml(ord.remark) + '</div>' : '') +
+        // ── 操作按钮 ──
         '<div class="hmq-card-foot">' +
           actions.map(function(a) {
             return '<button class="hmq-btn hmq-btn-' + a.cls.replace('btn-','') +
@@ -359,8 +394,22 @@ var HMQView = (function () {
       '.hmq-temp-hint{font-size:12px;color:#7A5200;background:#FEF6E2;padding:2px 8px;border-radius:4px;border:1px solid #EAC860}',
       '.hmq-card-meta{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:#64748b;margin-bottom:8px}',
       '.hmq-card-meta strong{color:#0f172a}',
-      '.hmq-card-items{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}',
-      '.hmq-item-pill{background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:3px 8px;font-size:12px}',
+      '.hmq-card-total{margin-left:auto;font-size:13px;font-weight:700;color:#1e40af;background:#eff6ff;padding:2px 10px;border-radius:4px}',
+      '.hmq-card-meta code{font-size:11px;color:#94a3b8;font-family:monospace}',
+      '.hmq-items-wrap{overflow-x:auto;margin-bottom:10px;border:1px solid #e2e8f0;border-radius:6px}',
+      '.hmq-items-table{width:100%;border-collapse:collapse;font-size:12px}',
+      '.hmq-items-table th{background:#f8fafc;font-weight:600;color:#374151;padding:7px 10px;text-align:left;white-space:nowrap;border-bottom:1px solid #e2e8f0}',
+      '.hmq-items-table td{padding:7px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top}',
+      '.hmq-items-table tbody tr:last-child td{border-bottom:none}',
+      '.hmq-items-table tfoot td{border-top:2px solid #e2e8f0;font-weight:700;background:#f8fafc;padding:7px 10px}',
+      '.hmq-td-name{min-width:120px}',
+      '.hmq-td-num{text-align:right;white-space:nowrap}',
+      '.hmq-td-sub{color:#1e40af}',
+      '.hmq-tfoot-label{text-align:right;color:#374151}',
+      '.hmq-tfoot-total{color:#1e40af;font-size:13px}',
+      '.hmq-row-temp{background:#fffbeb}',
+      '.hmq-sku-code{font-size:10px;color:#94a3b8;font-family:monospace}',
+      '.hmq-buy-link{color:#2563eb;text-decoration:none;font-size:12px;white-space:nowrap}.hmq-buy-link:hover{text-decoration:underline}',
       '.hmq-remark{font-size:12px;color:#64748b;margin-bottom:8px}',
       '.hmq-link{color:#2563eb;text-decoration:underline}',
       '.hmq-reject{font-size:12px;color:#9E251C;background:#FEF0EE;padding:2px 8px;border-radius:4px}',

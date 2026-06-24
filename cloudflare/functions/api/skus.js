@@ -57,7 +57,8 @@ export async function onRequestGet({ request, env }) {
 
   const rows = await db.prepare(`
     SELECT s.id, s.code, s.name, s.spec, s.unit, s.brand,
-           s.category, s.is_temporary, s.project_id, s.last_price
+           s.category, s.is_temporary, s.project_id, s.last_price,
+           s.purchase_url
     FROM sku_library s ${whereSQL}
     ORDER BY s.is_temporary ASC, s.name ASC
     LIMIT ? OFFSET ?

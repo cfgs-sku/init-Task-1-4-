@@ -67,11 +67,16 @@ export async function onRequestGet({ request, env }) {
     LIMIT ? OFFSET ?
   `).bind(...binds, pageSize, offset).all();
 
-  // 附带每个订单的 items（简要）
+  // 附带每个订单的 items（含采购链接）
   const orders = await Promise.all((rows.results || []).map(async ord => {
-    const items = await db.prepare(
-      'SELECT sku_code,sku_name,qty,unit,est_price,is_temp FROM order_items WHERE order_id=?'
-    ).bind(ord.id).all();
+    const items = await db.prepare(`
+      SELECT oi.sku_code, oi.sku_name, oi.brand, oi.spec, oi.qty, oi.unit,
+             oi.est_price, oi.is_temp,
+             sl.purchase_url
+      FROM order_items oi
+      LEFT JOIN sku_library sl ON sl.code = oi.sku_code
+      WHERE oi.order_id = ?
+    `).bind(ord.id).all();
     return { ...ord, items: items.results || [] };
   }));
 

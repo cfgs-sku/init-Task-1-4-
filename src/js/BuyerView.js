@@ -67,19 +67,55 @@ var BuyerView = (function () {
   }
 
   // ── 1. 标准库搜索 Tab ─────────────────────────────────────────
+  var _skuPage = 1;
+  var _skuTotal = 0;
+  var _skuPageSize = 50;
+  var _skuLastQ = '';
+
   function _renderSearch(el) {
     el.innerHTML =
       '<div class="bv-panel">' +
-        '<div class="bv-panel-hd">物资标准库</div>' +
+        '<div class="bv-panel-hd">物资标准库 <span class="bv-sku-total" id="bv-sku-total"></span></div>' +
         '<div class="bv-search-bar">' +
           '<input id="bv-q" class="bv-input" placeholder="搜索物资名称 / 编码 / 规格…" oninput="BuyerView._onSearch()">' +
         '</div>' +
-        '<div id="bv-sku-list" class="bv-sku-list">输入关键词开始搜索</div>' +
+        '<div id="bv-sku-list" class="bv-sku-list"><div class="bv-loading">加载中…</div></div>' +
+        '<div id="bv-sku-pager" class="bv-pager"></div>' +
         '<div class="bv-panel-foot">' +
           '<button class="bv-btn bv-btn-amber" onclick="BuyerView._openTempModal()">＋ 找不到？添加临时非标物资</button>' +
         '</div>' +
       '</div>' +
       _tempSkuModal();
+
+    // 页面打开立即加载第一页
+    _skuPage = 1;
+    _skuLastQ = '';
+    _loadSkus('', 1);
+  }
+
+  function _loadSkus(q, page) {
+    _skuLastQ = q;
+    _skuPage  = page || 1;
+    var el = document.getElementById('bv-sku-list');
+    if (el) el.innerHTML = '<div class="bv-loading">加载中…</div>';
+
+    var url = '/api/skus?type=library&page=' + _skuPage +
+              '&page_size=' + _skuPageSize +
+              '&project_id=' + encodeURIComponent((_user && _user.project_id) || '');
+    if (q) url += '&q=' + encodeURIComponent(q);
+
+    RoleRouter.fetch(url)
+      .then(function(res) {
+        var list = (res.ok && res.skus) ? res.skus : [];
+        _skuTotal = (res.ok && res.total) ? res.total : list.length;
+        _renderSkuList(document.getElementById('bv-sku-list'), list, q);
+        _renderPager();
+        var tot = document.getElementById('bv-sku-total');
+        if (tot) tot.textContent = '共 ' + _skuTotal + ' 条';
+      })
+      .catch(function() {
+        _doSearchLocal(document.getElementById('bv-sku-list'), q);
+      });
   }
 
   var _searchTimer = null;
@@ -87,28 +123,8 @@ var BuyerView = (function () {
     clearTimeout(_searchTimer);
     _searchTimer = setTimeout(function() {
       var q = (document.getElementById('bv-q')?.value || '').trim();
-      if (!q) { document.getElementById('bv-sku-list').innerHTML = '输入关键词开始搜索'; return; }
-      _doSearch(q);
+      _loadSkus(q, 1);
     }, 300);
-  }
-
-  function _doSearch(q) {
-    var el = document.getElementById('bv-sku-list');
-    el.innerHTML = '<div class="bv-loading">搜索中…</div>';
-
-    // 优先走 API 查 D1 数据库，降级为本地 DB 搜索
-    if (typeof RoleRouter !== 'undefined') {
-      RoleRouter.fetch('/api/skus?type=library&q=' + encodeURIComponent(q) +
-                       '&project_id=' + encodeURIComponent((_user && _user.project_id) || '') +
-                       '&page_size=30')
-        .then(function(res) {
-          var list = (res.ok && res.skus) ? res.skus : [];
-          _renderSkuList(el, list, q);
-        })
-        .catch(function() { _doSearchLocal(el, q); });
-    } else {
-      _doSearchLocal(el, q);
-    }
   }
 
   // 降级：搜本地 DB 全局变量（兼容旧版离线数据）
@@ -129,26 +145,62 @@ var BuyerView = (function () {
   }
 
   function _renderSkuList(el, results, q) {
+    if (!el) return;
     if (!results.length) {
-      el.innerHTML = '<div class="bv-empty">未找到「' + escapeHtml(q) + '」相关物资<br><small>可点击下方按钮添加临时非标</small></div>';
+      el.innerHTML = q
+        ? '<div class="bv-empty">未找到「' + escapeHtml(q) + '」相关物资<br><small>可点击下方按钮添加临时非标</small></div>'
+        : '<div class="bv-empty">物资库暂无数据</div>';
       return;
     }
     el.innerHTML = results.map(function(r) {
-      var name = r.name || r.sku_name || '';
-      var code = r.code || r.sku_code || '';
-      var spec = r.spec || '';
+      var name  = r.name  || r.sku_name || '';
+      var code  = r.code  || r.sku_code || '';
+      var spec  = r.spec  || '';
       var brand = r.brand || '';
-      var unit = r.unit || '';
+      var unit  = r.unit  || '';
+      var price = r.last_price || r.est_price || 0;
       return '<div class="bv-sku-row">' +
         '<div class="bv-sku-info">' +
-          '<div class="bv-sku-name">' + escapeHtml(name) + ' <span class="bv-sku-code">' + escapeHtml(code) + '</span></div>' +
-          '<div class="bv-sku-meta">' + escapeHtml(spec) + (brand ? ' · ' + escapeHtml(brand) : '') + (unit ? ' · ' + escapeHtml(unit) : '') + '</div>' +
+          '<div class="bv-sku-name">' + escapeHtml(name) +
+            '<span class="bv-sku-code">' + escapeHtml(code) + '</span></div>' +
+          '<div class="bv-sku-meta">' +
+            (spec  ? escapeHtml(spec)  : '') +
+            (brand ? ' · ' + escapeHtml(brand) : '') +
+            (unit  ? ' · ' + escapeHtml(unit)  : '') +
+            (price ? ' · ¥' + price            : '') +
+          '</div>' +
         '</div>' +
         '<button class="bv-btn bv-btn-sm bv-btn-primary" onclick="BuyerView._addToCart(' +
-          JSON.stringify({code:code,name:name,brand:brand,spec:spec,unit:unit,est_price:r.last_price||r.est_price||0}).replace(/"/g,'&quot;') +
+          JSON.stringify({code:code,name:name,brand:brand,spec:spec,unit:unit,est_price:price}).replace(/"/g,'&quot;') +
         ')">加入购物车</button>' +
       '</div>';
     }).join('');
+  }
+
+  function _renderPager() {
+    var el = document.getElementById('bv-sku-pager');
+    if (!el) return;
+    var totalPages = Math.ceil(_skuTotal / _skuPageSize);
+    if (totalPages <= 1) { el.innerHTML = ''; return; }
+    var html = '<div class="bv-pager-row">';
+    html += '<button class="bv-btn bv-btn-xs' + (_skuPage <= 1 ? ' bv-btn-disabled' : '') + '" ' +
+            'onclick="BuyerView._goPage(' + (_skuPage - 1) + ')" ' +
+            (_skuPage <= 1 ? 'disabled' : '') + '>上一页</button>';
+    html += '<span class="bv-pager-info">第 ' + _skuPage + ' / ' + totalPages + ' 页</span>';
+    html += '<button class="bv-btn bv-btn-xs' + (_skuPage >= totalPages ? ' bv-btn-disabled' : '') + '" ' +
+            'onclick="BuyerView._goPage(' + (_skuPage + 1) + ')" ' +
+            (_skuPage >= totalPages ? 'disabled' : '') + '>下一页</button>';
+    html += '</div>';
+    el.innerHTML = html;
+  }
+
+  function _goPage(page) {
+    var totalPages = Math.ceil(_skuTotal / _skuPageSize);
+    if (page < 1 || page > totalPages) return;
+    _loadSkus(_skuLastQ, page);
+    // 滚动回列表顶部
+    var el = document.getElementById('bv-sku-list');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // ── 临时 SKU 弹窗 ─────────────────────────────────────────────
@@ -390,22 +442,53 @@ var BuyerView = (function () {
     if (!_orders.length) return '<div class="bv-empty">暂无订单记录</div>';
     return _orders.map(function(ord) {
       var actions = OrderStatusTag.getActions(ord.status, 'buyer');
+      var items   = ord.items || [];
+      var total   = items.reduce(function(s, it) {
+        return s + (parseFloat(it.est_price) || 0) * (parseInt(it.qty) || 1);
+      }, 0);
+
       return '<div class="bv-ord-card">' +
+        // 头部
         '<div class="bv-ord-hd">' +
           '<span class="bv-ord-id">' + escapeHtml(ord.id) + '</span>' +
           OrderStatusTag.render(ord.status) +
-          (ord.reject_reason ? '<span class="bv-reject-reason">驳回原因：' + escapeHtml(ord.reject_reason) + '</span>' : '') +
+          '<span class="bv-ord-total">合计 ¥' + total.toFixed(2) + '</span>' +
+          (ord.reject_reason ? '<span class="bv-reject-reason">驳回：' + escapeHtml(ord.reject_reason) + '</span>' : '') +
         '</div>' +
-        '<div class="bv-ord-items">' +
-          (ord.items || []).map(function(it) {
-            return '<span class="bv-ord-item-pill">' +
-              escapeHtml(it.sku_name) + ' ×' + it.qty +
-              OrderStatusTag.tempBadge(it.is_temp) +
-            '</span>';
-          }).join('') +
+        // 时间
+        '<div class="bv-ord-time-row">🕐 ' + (ord.created_at || '').replace('T',' ').slice(0,16) +
+          (ord.remark ? '　💬 ' + escapeHtml(ord.remark) : '') +
         '</div>' +
+        // 明细表
+        '<div class="bv-ord-table-wrap">' +
+          '<table class="bv-ord-table">' +
+            '<thead><tr><th>#</th><th>物资名称</th><th>规格</th><th>单位</th><th>数量</th><th>单价(¥)</th><th>小计(¥)</th><th>采购链接</th></tr></thead>' +
+            '<tbody>' +
+            items.map(function(it, i) {
+              var price = parseFloat(it.est_price) || 0;
+              var qty   = parseInt(it.qty) || 1;
+              var url   = it.purchase_url || '';
+              return '<tr>' +
+                '<td>' + (i+1) + '</td>' +
+                '<td><strong>' + escapeHtml(it.sku_name||'') + '</strong>' + OrderStatusTag.tempBadge(it.is_temp) + '</td>' +
+                '<td>' + escapeHtml(it.spec  || '—') + '</td>' +
+                '<td>' + escapeHtml(it.unit  || '—') + '</td>' +
+                '<td style="text-align:right">' + qty + '</td>' +
+                '<td style="text-align:right">' + (price ? price.toFixed(2) : '—') + '</td>' +
+                '<td style="text-align:right;color:#1e40af">' + (price ? (price*qty).toFixed(2) : '—') + '</td>' +
+                '<td>' + (url ? '<a href="' + escapeHtml(url) + '" target="_blank" class="bv-buy-link">🛒 购买</a>' : '—') + '</td>' +
+              '</tr>';
+            }).join('') +
+            '</tbody>' +
+            '<tfoot><tr>' +
+              '<td colspan="6" style="text-align:right;font-weight:700;padding:6px 10px">合计</td>' +
+              '<td style="text-align:right;font-weight:700;color:#1e40af;padding:6px 10px">¥' + total.toFixed(2) + '</td>' +
+              '<td></td>' +
+            '</tr></tfoot>' +
+          '</table>' +
+        '</div>' +
+        // 操作
         '<div class="bv-ord-foot">' +
-          '<span class="bv-ord-time">' + ord.created_at + '</span>' +
           actions.map(function(a) {
             return '<button class="bv-btn bv-btn-sm ' + a.cls + '" ' +
               'onclick="BuyerView._orderAction(\'' + ord.id + '\',\'' + a.action + '\',' + (a.needReason||false) + ')">' +
@@ -454,7 +537,12 @@ var BuyerView = (function () {
       '.bv-search-bar{padding:14px 20px}',
       '.bv-input{width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;outline:none;transition:.15s}',
       '.bv-input:focus{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.15)}',
-      '.bv-sku-list{padding:0 20px 16px}',
+      '.bv-sku-total{font-size:12px;color:#94a3b8;font-weight:400;margin-left:8px}',
+      '.bv-sku-list{padding:0 20px 4px}',
+      '.bv-pager{padding:10px 20px;border-top:1px solid #f1f5f9}',
+      '.bv-pager-row{display:flex;align-items:center;gap:10px;justify-content:center}',
+      '.bv-pager-info{font-size:12px;color:#64748b;min-width:80px;text-align:center}',
+      '.bv-btn-disabled{opacity:.4;cursor:not-allowed}',
       '.bv-sku-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f1f5f9}',
       '.bv-sku-name{font-weight:600;font-size:13px}',
       '.bv-sku-code{font-size:11px;color:#94a3b8;font-weight:400;margin-left:6px}',
@@ -467,12 +555,18 @@ var BuyerView = (function () {
       '.bv-remark-field{flex:1;display:flex;align-items:center;gap:8px}',
       '.bv-remark-field label{white-space:nowrap;font-size:13px;color:#374151}',
       '.bv-ord-card{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:10px}',
-      '.bv-ord-hd{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}',
-      '.bv-ord-id{font-size:12px;color:#94a3b8;font-family:monospace}',
-      '.bv-ord-items{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}',
-      '.bv-ord-item-pill{background:#f1f5f9;border-radius:4px;padding:3px 8px;font-size:12px}',
-      '.bv-ord-foot{display:flex;align-items:center;gap:8px}',
-      '.bv-ord-time{font-size:11px;color:#94a3b8;flex:1}',
+      '.bv-ord-hd{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}',
+      '.bv-ord-id{font-size:11px;color:#94a3b8;font-family:monospace}',
+      '.bv-ord-total{margin-left:auto;font-size:13px;font-weight:700;color:#1e40af;background:#eff6ff;padding:2px 10px;border-radius:4px}',
+      '.bv-ord-time-row{font-size:12px;color:#64748b;margin-bottom:8px}',
+      '.bv-ord-table-wrap{overflow-x:auto;margin-bottom:10px;border:1px solid #e2e8f0;border-radius:6px}',
+      '.bv-ord-table{width:100%;border-collapse:collapse;font-size:12px}',
+      '.bv-ord-table th{background:#f8fafc;font-weight:600;color:#374151;padding:6px 10px;text-align:left;white-space:nowrap;border-bottom:1px solid #e2e8f0}',
+      '.bv-ord-table td{padding:6px 10px;border-bottom:1px solid #f1f5f9;vertical-align:middle}',
+      '.bv-ord-table tbody tr:last-child td{border-bottom:none}',
+      '.bv-ord-table tfoot td{border-top:2px solid #e2e8f0;background:#f8fafc}',
+      '.bv-buy-link{color:#2563eb;text-decoration:none;font-size:12px;white-space:nowrap}.bv-buy-link:hover{text-decoration:underline}',
+      '.bv-ord-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
       '.bv-reject-reason{font-size:12px;color:#9E251C;background:#FEF0EE;padding:2px 8px;border-radius:4px}',
       '.bv-field{margin-bottom:12px}',
       '.bv-field label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:4px}',
@@ -501,6 +595,7 @@ var BuyerView = (function () {
   return {
     mount:          mount,
     _onSearch:      _onSearch,
+    _goPage:        _goPage,
     _addToCart:     _addToCart,
     _openTempModal: _openTempModal,
     _closeTempModal:_closeTempModal,
