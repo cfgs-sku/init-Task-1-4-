@@ -91,13 +91,8 @@ html,body{height:100%;font-family:'PingFang SC','Microsoft YaHei',sans-serif;fon
 <script src="./js/HMQView.js"></script>
 <!-- 5. 角色路由（最后加载，init 触发整个应用） -->
 <script src="./js/RoleRouter.js"></script>
-<!-- 6. 原有物资库数据（供 BuyerView 搜索使用） -->
-<script src="../embed-data.js"></script>
 <script>
-  // 原有 DB 全局变量兜底（embed-data.js 不含时使用空数组）
-  if (typeof DB === 'undefined') window.DB = [];
-  if (typeof ORDER_ITEMS === 'undefined') window.ORDER_ITEMS = [];
-  // 启动
+  // 启动（物资库数据直接走 /api/skus 查 D1，无需本地 embed-data.js）
   window.addEventListener('load', function() {
     RoleRouter.init();
   });
