@@ -1,49 +1,107 @@
 @echo off
-chcp 65001 >nul
 cd /d "%~dp0"
 
-echo ╔══════════════════════════════════════════╗
-echo ║   城服物资采购系统 — 一键构建 ^& 部署      ║
-echo ╚══════════════════════════════════════════╝
+:MENU
+cls
 echo.
-
-REM ── 步骤 1：构建 dist/portal.html（内联所有 JS）
-echo [1/4] 构建 portal.html ...
-node scripts/build-portal.js
-if errorlevel 1 ( echo ❌ 构建失败 & pause & exit /b 1 )
-
-REM ── 步骤 2：Git 提交
+echo  ==========================================
+echo   CSFW Purchase System - Deploy Tool
+echo  ==========================================
 echo.
-echo [2/4] 提交代码到 dev 分支 ...
-git checkout dev 2>nul || git checkout -b dev
-git add -A
-
-set /p MSG="提交说明（回车使用时间戳）: "
-if "%MSG%"=="" (
-  for /f "tokens=2 delims==" %%i in ('wmic os get localdatetime /value') do set DT=%%i
-  set MSG=deploy: 自动构建部署 !DT:~0,12!
-)
-git commit -m "%MSG%" 2>nul
-if errorlevel 1 ( echo ℹ️  没有新变更需要提交，继续... )
-
-REM ── 步骤 3：推送 GitHub（触发 Cloudflare 自动部署）
+echo   1. Push to TEST  (dev branch)
+echo   2. Release to PROD  (main branch)
+echo   3. View version history
+echo   4. Rollback production
+echo   5. Show current status
+echo   6. Exit
 echo.
-echo [3/4] 推送到 GitHub (dev 分支) ...
+set /p choice= Enter number:
+
+if "%choice%"=="1" goto PUSH_DEV
+if "%choice%"=="2" goto PUSH_MAIN
+if "%choice%"=="3" goto SHOW_LOG
+if "%choice%"=="4" goto ROLLBACK
+if "%choice%"=="5" goto STATUS
+if "%choice%"=="6" exit
+goto MENU
+
+:PUSH_DEV
+echo.
+echo [Push to TEST - dev branch]
+set /p msg= Commit message (e.g. fix search input default value):
+git checkout dev 2>nul
+git add .
+git commit -m "%msg%"
 git push origin dev
-if errorlevel 1 ( echo ❌ Git push 失败，请检查网络或权限 & pause & exit /b 1 )
-
-REM ── 步骤 4：直接部署 dist 到 Cloudflare Pages（可选，双保险）
 echo.
-echo [4/4] 部署 dist/ 到 Cloudflare Pages ...
-wrangler pages deploy dist --project-name csfw-purchase
-if errorlevel 1 (
-  echo ⚠️  wrangler deploy 失败，但 GitHub push 已完成，Cloudflare 会自动部署。
-)
-
+echo Done! Check test site in ~1 min:
+echo https://dev.csfw-purchase.pages.dev
 echo.
-echo ══════════════════════════════════════════
-echo ✅ 完成！
-echo    云端地址：https://csfw-purchase.pages.dev/portal.html
-echo    采购员可通过上方链接登录下单，数据自动存入云端数据库。
-echo ══════════════════════════════════════════
 pause
+goto MENU
+
+:PUSH_MAIN
+echo.
+echo [Release to PRODUCTION - main branch]
+echo Make sure you tested on dev first!
+set /p confirm= Confirm release to production? (y/n):
+if /i "%confirm%" neq "y" goto MENU
+git checkout main
+git merge dev
+git push origin main
+git checkout dev
+echo.
+echo Done! Production will update in ~1 min:
+echo https://csfw-purchase.pages.dev
+echo.
+pause
+goto MENU
+
+:SHOW_LOG
+echo.
+echo [Version History - last 10 commits]
+echo.
+git log --oneline --graph -10
+echo.
+echo The 7-char code on each line (e.g. a3f2c1b) is the version ID for rollback.
+echo.
+pause
+goto MENU
+
+:ROLLBACK
+echo.
+echo [Rollback Production]
+echo.
+echo Recent versions on main:
+git log origin/main --oneline -8
+echo.
+set /p ver= Enter version ID to rollback to (e.g. a3f2c1b):
+echo.
+echo WARNING: This will revert production (main) to version %ver%
+set /p confirm= Confirm rollback? (y/n):
+if /i "%confirm%" neq "y" goto MENU
+git checkout main
+git revert %ver%..HEAD --no-edit
+git push origin main
+git checkout dev
+echo.
+echo Rollback done! Production will restore in ~1 min.
+echo.
+pause
+goto MENU
+
+:STATUS
+echo.
+echo [Current Status]
+echo.
+echo -- Current branch --
+git branch
+echo.
+echo -- Uncommitted changes --
+git status --short
+echo.
+echo -- Unpushed commits --
+git log origin/dev..HEAD --oneline 2>nul || echo (none)
+echo.
+pause
+goto MENU

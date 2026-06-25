@@ -30,6 +30,7 @@ if (!FILE) {
 
 // ── 读取 CSV ────────────────────────────────────────────────────
 const lines = fs.readFileSync(path.resolve(FILE), 'utf-8')
+  .replace(/^﻿/, '')          // 剥离 UTF-8 BOM
   .split('\n').map(l => l.trim()).filter(Boolean);
 
 const headers = lines[0].split(',').map(h => h.trim());

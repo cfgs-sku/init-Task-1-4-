@@ -88,8 +88,10 @@ function loadLocal(){
     initCats();
     var dbInp = document.getElementById('db-inp');
     if(dbInp) dbInp.value = '';
-    // 浏览器自动填充在 load 后触发，用 setTimeout 兜底再清一次
-    setTimeout(function(){ var el=document.getElementById('db-inp'); if(el&&el.value){ el.value=''; dbSearch(''); } }, 200);
+    // 浏览器自动填充时机不定，多次兜底清除
+    [300,600,1200].forEach(function(t){
+      setTimeout(function(){ var el=document.getElementById('db-inp'); if(el&&el.value){ el.value=''; dbSearch(''); } }, t);
+    });
     dbSearch('');
     updateCartStats();
     // 采购中心模块初始化（DB就绪后）
