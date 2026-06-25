@@ -55,6 +55,8 @@ CREATE TABLE IF NOT EXISTS sku_library (
                     CHECK(is_temporary IN (0,1)),
   project_id    TEXT DEFAULT NULL,            -- NULL=全局通用; 非NULL=项目专属临时SKU
   last_price    REAL DEFAULT 0,
+  image_url     TEXT DEFAULT '',              -- 物资图片链接
+  purchase_url  TEXT DEFAULT '',              -- 主要采购平台链接
   updated_at    TEXT DEFAULT (datetime('now')),
   FOREIGN KEY(project_id) REFERENCES projects(id)
 );
@@ -156,36 +158,57 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 -- 8. 种子数据（首次部署执行）
 -- ════════════════════════════════════════════════════════════════
 
--- ── 项目 ─────────────────────────────────────────────────────
+-- ── 项目（21个真实项目）──────────────────────────────────────────
 INSERT OR IGNORE INTO projects(id, name, code) VALUES
-  ('proj_gc',  '雄安城服物业项目',   'GC-001'),
-  ('proj_xc',  '西部城服广场项目',  'XC-002'),
-  ('proj_nb',  '南滨物业项目',     'NB-003'),
-  ('proj_bd',  '滨东物业项目',     'BD-004');
+  ('proj_p01', '华望城中央商务区项目',         'P-001'),
+  ('proj_p02', '创智园项目',                   'P-002'),
+  ('proj_p03', '商务服务中心项目',             'P-003'),
+  ('proj_p04', '白塔幼儿园',                   'P-004'),
+  ('proj_p05', '中关村项目',                   'P-005'),
+  ('proj_p06', '容东片区4号能源站办公区项目', 'P-006'),
+  ('proj_p07', '东部社区服务中心项目',         'P-007'),
+  ('proj_p08', '华府府住宅项目',               'P-008'),
+  ('proj_p09', '华望城工程维修中心项目',       'P-009'),
+  ('proj_p10', '金融岛住宅项目',               'P-010'),
+  ('proj_p11', '金融岛壹号院项目房修',         'P-011'),
+  ('proj_p12', '金融岛案场项目',               'P-012'),
+  ('proj_p13', '华府府案场项目',               'P-013'),
+  ('proj_p14', '优品住宅项目',                 'P-014'),
+  ('proj_p15', '地下空间管理项目',             'P-015'),
+  ('proj_p16', '委托管理项目',                 'P-016'),
+  ('proj_p17', '容东综合运动馆',               'P-017'),
+  ('proj_p18', '雄安图书馆',                   'P-018'),
+  ('proj_p19', '科创中心中试基地',             'P-019'),
+  ('proj_p20', '水厂项目',                     'P-020'),
+  ('proj_p21', '综合办公室',                   'P-021');
 
--- ── 管理员 & 招采主管 ──────────────────────────────────────────
+-- ── 管理员（最高权限）& 招采主管 ──────────────────────────────────
 INSERT OR IGNORE INTO users(id, name, username, password, role, project_id) VALUES
   ('usr_admin', '刘宾',   'admin', 'csfw2024admin', 'admin', NULL),
-  ('usr_hmq',   '何梦琪', 'hmq',   'hmq',           'hmq',   NULL);
+  ('usr_hmq',   '何梦琪', 'hmq',   'hmq2024',       'hmq',   NULL);
 
--- ── 采购员（初始密码 123456，首次登录建议修改）──────────────────
+-- ── 采购员（初始密码 123456）──────────────────────────────────────
+-- 注：王籽媛管两个项目，建两个账号 wzy(华望城) wzy2(中关村)
+--     李雨晴管两个项目，建两个账号 lyq(华府住宅) lyq2(金融岛房修)
 INSERT OR IGNORE INTO users(id, name, username, password, role, project_id) VALUES
-  ('usr_wxy',  '王籽媛', 'wxy',  '123456', 'buyer', 'proj_gc'),
-  ('usr_pmy',  '柏梦园', 'pmy',  '123456', 'buyer', 'proj_gc'),
-  ('usr_cjj',  '崔晶晶', 'cjj',  '123456', 'buyer', 'proj_gc'),
-  ('usr_ly',   '李玉',   'ly',   '123456', 'buyer', 'proj_gc'),
-  ('usr_wxn',  '魏雪宁', 'wxn',  '123456', 'buyer', 'proj_xc'),
-  ('usr_dyq',  '段娇奇', 'dyq',  '123456', 'buyer', 'proj_xc'),
-  ('usr_lyj',  '李雨晴', 'lyj',  '123456', 'buyer', 'proj_xc'),
-  ('usr_zrf',  '张若菲', 'zrf',  '123456', 'buyer', 'proj_xc'),
-  ('usr_bjl',  '薄佳乐', 'bjl',  '123456', 'buyer', 'proj_nb'),
-  ('usr_zyn',  '赵一诺', 'zyn',  '123456', 'buyer', 'proj_nb'),
-  ('usr_wzh',  '王兆辉', 'wzh',  '123456', 'buyer', 'proj_nb'),
-  ('usr_zww',  '赵微微', 'zww',  '123456', 'buyer', 'proj_nb'),
-  ('usr_sy',   '苏颖',   'sy',   '123456', 'buyer', 'proj_bd'),
-  ('usr_wnn',  '王宁宁', 'wnn',  '123456', 'buyer', 'proj_bd'),
-  ('usr_chs',  '池胜洋', 'chs',  '123456', 'buyer', 'proj_bd'),
-  ('usr_ds',   '杜淼',   'ds',   '123456', 'buyer', 'proj_bd'),
-  ('usr_lqj',  '卢晴晴', 'lqj',  '123456', 'buyer', 'proj_gc'),
-  ('usr_czh',  '崔梓涵', 'czh',  '123456', 'buyer', 'proj_xc'),
-  ('usr_wjm',  '王嘉铭', 'wjm',  '123456', 'buyer', 'proj_nb');
+  ('usr_wzy',  '王籽媛', 'wzy',  '123456', 'buyer', 'proj_p01'),  -- 华望城中央商务区
+  ('usr_bmy',  '柏梦园', 'bmy',  '123456', 'buyer', 'proj_p02'),  -- 创智园
+  ('usr_cjj',  '崔晶晶', 'cjj',  '123456', 'buyer', 'proj_p03'),  -- 商务服务中心
+  ('usr_ly',   '李玉',   'ly',   '123456', 'buyer', 'proj_p04'),  -- 白塔幼儿园
+  ('usr_wzy2', '王籽媛', 'wzy2', '123456', 'buyer', 'proj_p05'),  -- 中关村（王籽媛第2账号）
+  ('usr_wxn',  '魏雪宁', 'wxn',  '123456', 'buyer', 'proj_p06'),  -- 容东4号能源站
+  ('usr_djq',  '段娇奇', 'djq',  '123456', 'buyer', 'proj_p07'),  -- 东部社区服务中心
+  ('usr_lyq',  '李雨晴', 'lyq',  '123456', 'buyer', 'proj_p08'),  -- 华府府住宅
+  ('usr_zrf',  '张若菲', 'zrf',  '123456', 'buyer', 'proj_p09'),  -- 华望城工程维修中心
+  ('usr_bjl',  '薄佳乐', 'bjl',  '123456', 'buyer', 'proj_p10'),  -- 金融岛住宅
+  ('usr_lyq2', '李雨晴', 'lyq2', '123456', 'buyer', 'proj_p11'),  -- 金融岛壹号院房修（李雨晴第2账号）
+  ('usr_zyn',  '赵一诺', 'zyn',  '123456', 'buyer', 'proj_p12'),  -- 金融岛案场
+  ('usr_wzh',  '王兆辉', 'wzh',  '123456', 'buyer', 'proj_p13'),  -- 华府府案场
+  ('usr_zww',  '赵微微', 'zww',  '123456', 'buyer', 'proj_p14'),  -- 优品住宅
+  ('usr_sy',   '苏颖',   'sy',   '123456', 'buyer', 'proj_p15'),  -- 地下空间管理
+  ('usr_wnn',  '王宁宁', 'wnn',  '123456', 'buyer', 'proj_p16'),  -- 委托管理
+  ('usr_csy',  '池胜洋', 'csy',  '123456', 'buyer', 'proj_p17'),  -- 容东综合运动馆
+  ('usr_dm',   '杜淼',   'dm',   '123456', 'buyer', 'proj_p18'),  -- 雄安图书馆
+  ('usr_lqq',  '卢晴晴', 'lqq',  '123456', 'buyer', 'proj_p19'),  -- 科创中心中试基地
+  ('usr_czh',  '崔梓涵', 'czh',  '123456', 'buyer', 'proj_p20'),  -- 水厂项目
+  ('usr_wjm',  '王嘉铭', 'wjm',  '123456', 'buyer', 'proj_p21');  -- 综合办公室

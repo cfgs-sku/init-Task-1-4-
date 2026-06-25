@@ -5,10 +5,14 @@
 var HMQView = (function () {
   'use strict';
 
-  var _tab     = 'orders';    // 'orders' | 'temp_skus' | 'projects'
+  var _tab     = 'orders';    // 'orders' | 'temp_skus' | 'projects' | 'skudb'
   var _orders  = [];
   var _tempList = [];
   var _filterStatus = '';     // '' = 全部
+  var _skudbPage = 1;
+  var _skudbTotal = 0;
+  var _skudbQ = '';
+  var _skudbPageSize = 50;
 
   // ── 挂载 ─────────────────────────────────────────────────────
   function mount(container) {
@@ -31,6 +35,7 @@ var HMQView = (function () {
     return [
       ['orders',   '📋 采购订单总览'],
       ['temp_skus','🟡 临时 SKU 审核'],
+      ['skudb',    '📦 SKU 数据库'],
       ['projects', '🏗️ 项目管理'],
     ].map(function(item) {
       return '<div class="hmq-nav-item' + (_tab===item[0]?' on':'') + '" data-tab="' + item[0] + '">' + item[1] + '</div>';
@@ -52,6 +57,7 @@ var HMQView = (function () {
     if (!main) return;
     if (tab === 'orders')    _renderOrders(main);
     if (tab === 'temp_skus') _renderTempSkus(main);
+    if (tab === 'skudb')     _renderSkuDB(main);
     if (tab === 'projects')  _renderProjects(main);
   }
 
@@ -316,6 +322,125 @@ var HMQView = (function () {
     }).catch(function() { alert('网络错误'); });
   }
 
+  // ── 3. SKU 数据库 Tab ─────────────────────────────────────────
+  function _renderSkuDB(el) {
+    el.innerHTML =
+      '<div class="hmq-panel">' +
+        '<div class="hmq-panel-hd">' +
+          'SKU 数据库' +
+          '<span id="hmq-skudb-total" style="font-size:12px;color:#94a3b8;font-weight:400"></span>' +
+          '<input id="hmq-skudb-q" class="hmq-input" style="width:240px;margin-left:auto" placeholder="搜索名称 / 编码 / 品牌 / 规格…" oninput="HMQView._onSkuDBSearch()">' +
+          '<button class="hmq-btn hmq-btn-xs" onclick="HMQView._refreshSkuDB()">🔄 刷新</button>' +
+        '</div>' +
+        '<div id="hmq-skudb-body" class="hmq-loading">加载中…</div>' +
+        '<div id="hmq-skudb-pager" style="padding:10px 20px;border-top:1px solid #f1f5f9"></div>' +
+      '</div>';
+    _skudbPage = 1; _skudbQ = '';
+    _loadSkuDB('', 1);
+  }
+
+  var _skudbTimer = null;
+  function _onSkuDBSearch() {
+    clearTimeout(_skudbTimer);
+    _skudbTimer = setTimeout(function() {
+      var q = (document.getElementById('hmq-skudb-q')?.value || '').trim();
+      _loadSkuDB(q, 1);
+    }, 300);
+  }
+
+  function _refreshSkuDB() {
+    var q = (document.getElementById('hmq-skudb-q')?.value || '').trim();
+    _loadSkuDB(q, _skudbPage);
+  }
+
+  function _loadSkuDB(q, page) {
+    _skudbQ = q; _skudbPage = page || 1;
+    var body = document.getElementById('hmq-skudb-body');
+    if (body) body.innerHTML = '<div class="hmq-loading">加载中…</div>';
+    var url = '/api/skus?type=library&page=' + _skudbPage + '&page_size=' + _skudbPageSize;
+    if (q) url += '&q=' + encodeURIComponent(q);
+    RoleRouter.fetch(url)
+      .then(function(res) {
+        var list = res.ok ? (res.skus || []) : [];
+        _skudbTotal = res.ok ? (res.total || list.length) : 0;
+        var tot = document.getElementById('hmq-skudb-total');
+        if (tot) tot.textContent = '共 ' + _skudbTotal + ' 条';
+        if (body) body.innerHTML = _skudbTableHTML(list);
+        _renderSkuDBPager();
+      })
+      .catch(function() { if (body) body.innerHTML = '<div class="hmq-err">加载失败</div>'; });
+  }
+
+  function _skudbTableHTML(list) {
+    if (!list.length) return '<div class="hmq-empty">暂无数据</div>';
+    return '<div style="overflow-x:auto">' +
+      '<table class="hmq-skudb-table">' +
+        '<thead><tr>' +
+          '<th style="width:40px">#</th>' +
+          '<th style="width:56px">图片</th>' +
+          '<th style="width:140px">物料编码</th>' +
+          '<th>物资名称</th>' +
+          '<th style="width:80px">品牌</th>' +
+          '<th style="width:100px">类目</th>' +
+          '<th style="width:160px">规格型号</th>' +
+          '<th style="width:50px">单位</th>' +
+          '<th style="width:80px">参考价</th>' +
+          '<th style="width:90px">平台链接</th>' +
+          '<th style="width:60px">标识</th>' +
+        '</tr></thead>' +
+        '<tbody>' +
+        list.map(function(r, idx) {
+          var rowNum = (_skudbPage - 1) * _skudbPageSize + idx + 1;
+          var img = r.image_url || '';
+          var url = r.purchase_url || r.purchase_link || '';
+          var isTemp = r.is_temporary || r.is_temp;
+          return '<tr' + (isTemp ? ' style="background:#fffbeb"' : '') + '>' +
+            '<td style="text-align:center">' + rowNum + '</td>' +
+            '<td style="text-align:center">' +
+              (img
+                ? '<img src="' + escapeHtml(img) + '" style="width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid #e2e8f0" onerror="this.style.display=\'none\'">'
+                : '<div style="width:40px;height:40px;background:#f1f5f9;border-radius:4px;border:1px dashed #cbd5e1;display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#94a3b8">暂无</div>') +
+            '</td>' +
+            '<td><span style="font-size:11px;color:#1e40af;font-family:monospace;background:#eff6ff;padding:2px 5px;border-radius:3px">' + escapeHtml(r.code || '') + '</span></td>' +
+            '<td><strong>' + escapeHtml(r.name || '') + '</strong></td>' +
+            '<td>' + escapeHtml(r.brand || '—') + '</td>' +
+            '<td><span style="font-size:11px;color:#64748b">' + escapeHtml(r.category || '—') + '</span></td>' +
+            '<td style="font-size:11px;color:#64748b">' + escapeHtml(r.spec || '—') + '</td>' +
+            '<td style="text-align:center">' + escapeHtml(r.unit || '—') + '</td>' +
+            '<td style="text-align:right">' + (r.last_price ? '¥' + r.last_price : '—') + '</td>' +
+            '<td style="text-align:center">' +
+              (url ? '<a href="' + escapeHtml(url) + '" target="_blank" style="color:#fff;background:#0284c7;padding:2px 7px;border-radius:4px;font-size:11px;text-decoration:none">🛒购买</a>' : '<span style="color:#cbd5e1">—</span>') +
+            '</td>' +
+            '<td style="text-align:center">' + (isTemp ? '<span style="font-size:11px;color:#7c3aed;background:#f5f3ff;padding:1px 5px;border-radius:3px">临时</span>' : '<span style="font-size:11px;color:#16a34a">标准</span>') + '</td>' +
+          '</tr>';
+        }).join('') +
+        '</tbody>' +
+      '</table>' +
+    '</div>';
+  }
+
+  function _renderSkuDBPager() {
+    var el = document.getElementById('hmq-skudb-pager');
+    if (!el) return;
+    var totalPages = Math.ceil(_skudbTotal / _skudbPageSize);
+    if (totalPages <= 1) { el.innerHTML = ''; return; }
+    el.innerHTML = '<div style="display:flex;align-items:center;gap:10px;justify-content:center">' +
+      '<button class="hmq-btn hmq-btn-xs' + (_skudbPage<=1?' hmq-btn-gray':'') + '" ' +
+      'onclick="HMQView._skudbGoPage(' + (_skudbPage-1) + ')" ' + (_skudbPage<=1?'disabled':'') + '>上一页</button>' +
+      '<span style="font-size:12px;color:#64748b">第 ' + _skudbPage + ' / ' + totalPages + ' 页</span>' +
+      '<button class="hmq-btn hmq-btn-xs' + (_skudbPage>=totalPages?' hmq-btn-gray':'') + '" ' +
+      'onclick="HMQView._skudbGoPage(' + (_skudbPage+1) + ')" ' + (_skudbPage>=totalPages?'disabled':'') + '>下一页</button>' +
+    '</div>';
+  }
+
+  function _skudbGoPage(page) {
+    var totalPages = Math.ceil(_skudbTotal / _skudbPageSize);
+    if (page < 1 || page > totalPages) return;
+    _loadSkuDB(_skudbQ, page);
+    var el = document.getElementById('hmq-skudb-body');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   // 归档含临时 SKU 订单时，提示进入转正审核
   function _showPromoteHint(ordId) {
     if (confirm('✅ 归档成功！\n\n该订单包含临时非标物资，是否前往「临时 SKU 审核」将其转正？')) {
@@ -437,21 +562,28 @@ var HMQView = (function () {
       '.hmq-loading{padding:40px;text-align:center;color:#94a3b8}',
       '.hmq-empty{padding:40px;text-align:center;color:#94a3b8}',
       '.hmq-err{padding:24px;color:#dc2626;text-align:center}',
+      '.hmq-skudb-table{width:100%;border-collapse:collapse;font-size:12px;min-width:800px}',
+      '.hmq-skudb-table th{background:#f8fafc;font-weight:600;color:#374151;padding:8px 10px;text-align:left;border-bottom:2px solid #e2e8f0;white-space:nowrap}',
+      '.hmq-skudb-table td{padding:7px 10px;border-bottom:1px solid #f1f5f9;vertical-align:middle}',
+      '.hmq-skudb-table tbody tr:hover{background:#f8fafc}',
     ].join('');
   }
 
   // ── 公开 API ──────────────────────────────────────────────────
   return {
-    mount:           mount,
-    _refreshOrders:  _refreshOrders,
-    _orderAction:    _orderAction,
-    _refreshTemp:    _refreshTemp,
-    _promoteTemp:    _promoteTemp,
-    _rejectTemp:     _rejectTemp,
-    _closePromote:   _closePromote,
-    _confirmPromote: _confirmPromote,
-    _showAddProject: _showAddProject,
-    _hideAddProject: _hideAddProject,
-    _addProject:     _addProject,
+    mount:            mount,
+    _refreshOrders:   _refreshOrders,
+    _orderAction:     _orderAction,
+    _refreshTemp:     _refreshTemp,
+    _promoteTemp:     _promoteTemp,
+    _rejectTemp:      _rejectTemp,
+    _closePromote:    _closePromote,
+    _confirmPromote:  _confirmPromote,
+    _showAddProject:  _showAddProject,
+    _hideAddProject:  _hideAddProject,
+    _addProject:      _addProject,
+    _onSkuDBSearch:   _onSkuDBSearch,
+    _refreshSkuDB:    _refreshSkuDB,
+    _skudbGoPage:     _skudbGoPage,
   };
 })();

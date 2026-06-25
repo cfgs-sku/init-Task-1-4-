@@ -152,29 +152,52 @@ var BuyerView = (function () {
         : '<div class="bv-empty">物资库暂无数据</div>';
       return;
     }
-    el.innerHTML = results.map(function(r) {
-      var name  = r.name  || r.sku_name || '';
-      var code  = r.code  || r.sku_code || '';
-      var spec  = r.spec  || '';
-      var brand = r.brand || '';
-      var unit  = r.unit  || '';
-      var price = r.last_price || r.est_price || 0;
-      return '<div class="bv-sku-row">' +
-        '<div class="bv-sku-info">' +
-          '<div class="bv-sku-name">' + escapeHtml(name) +
-            '<span class="bv-sku-code">' + escapeHtml(code) + '</span></div>' +
-          '<div class="bv-sku-meta">' +
-            (spec  ? escapeHtml(spec)  : '') +
-            (brand ? ' · ' + escapeHtml(brand) : '') +
-            (unit  ? ' · ' + escapeHtml(unit)  : '') +
-            (price ? ' · ¥' + price            : '') +
-          '</div>' +
-        '</div>' +
-        '<button class="bv-btn bv-btn-sm bv-btn-primary" onclick="BuyerView._addToCart(' +
-          JSON.stringify({code:code,name:name,brand:brand,spec:spec,unit:unit,est_price:price}).replace(/"/g,'&quot;') +
-        ')">加入购物车</button>' +
-      '</div>';
-    }).join('');
+    el.innerHTML =
+      '<table class="bv-sku-table">' +
+        '<thead><tr>' +
+          '<th style="width:36px">#</th>' +
+          '<th style="width:56px">图片</th>' +
+          '<th style="width:130px">物料编码</th>' +
+          '<th>物资名称</th>' +
+          '<th style="width:80px">品牌</th>' +
+          '<th style="width:150px">规格型号</th>' +
+          '<th style="width:50px">单位</th>' +
+          '<th style="width:110px">参考价</th>' +
+          '<th style="width:110px">平台链接</th>' +
+          '<th style="width:80px">操作</th>' +
+        '</tr></thead>' +
+        '<tbody>' +
+        results.map(function(r, idx) {
+          var name  = r.name  || r.sku_name || '';
+          var code  = r.code  || r.sku_code || '';
+          var spec  = r.spec  || '';
+          var brand = r.brand || '';
+          var unit  = r.unit  || '';
+          var price = r.last_price || r.est_price || 0;
+          var img   = r.image_url  || '';
+          var url   = r.purchase_url || r.purchase_link || '';
+          var cartData = JSON.stringify({code:code,name:name,brand:brand,spec:spec,unit:unit,est_price:price}).replace(/"/g,'&quot;');
+          return '<tr>' +
+            '<td class="bv-tc">' + (_skuPage > 1 ? (_skuPage-1)*_skuPageSize + idx+1 : idx+1) + '</td>' +
+            '<td class="bv-tc">' +
+              (img
+                ? '<img src="' + escapeHtml(img) + '" class="bv-sku-img" onerror="this.style.display=\'none\'">'
+                : '<div class="bv-img-ph">暂无</div>') +
+            '</td>' +
+            '<td><span class="bv-code-tag">' + escapeHtml(code) + '</span></td>' +
+            '<td class="bv-sku-namecell"><strong>' + escapeHtml(name) + '</strong></td>' +
+            '<td>' + escapeHtml(brand || '—') + '</td>' +
+            '<td class="bv-spec-cell">' + escapeHtml(spec || '—') + '</td>' +
+            '<td class="bv-tc">' + escapeHtml(unit || '—') + '</td>' +
+            '<td class="bv-tr">' + (price ? '¥' + price : '—') + '</td>' +
+            '<td class="bv-tc">' +
+              (url ? '<a href="' + escapeHtml(url) + '" target="_blank" class="bv-plat-btn">🛒 购买</a>' : '<span class="bv-nodim">—</span>') +
+            '</td>' +
+            '<td class="bv-tc"><button class="bv-btn bv-btn-xs bv-btn-primary" onclick="BuyerView._addToCart(' + cartData + ')">＋ 购物车</button></td>' +
+          '</tr>';
+        }).join('') +
+        '</tbody>' +
+      '</table>';
   }
 
   function _renderPager() {
@@ -538,15 +561,26 @@ var BuyerView = (function () {
       '.bv-input{width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;outline:none;transition:.15s}',
       '.bv-input:focus{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.15)}',
       '.bv-sku-total{font-size:12px;color:#94a3b8;font-weight:400;margin-left:8px}',
-      '.bv-sku-list{padding:0 20px 4px}',
+      '.bv-sku-list{padding:0;overflow-x:auto}',
       '.bv-pager{padding:10px 20px;border-top:1px solid #f1f5f9}',
       '.bv-pager-row{display:flex;align-items:center;gap:10px;justify-content:center}',
       '.bv-pager-info{font-size:12px;color:#64748b;min-width:80px;text-align:center}',
       '.bv-btn-disabled{opacity:.4;cursor:not-allowed}',
-      '.bv-sku-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f1f5f9}',
-      '.bv-sku-name{font-weight:600;font-size:13px}',
-      '.bv-sku-code{font-size:11px;color:#94a3b8;font-weight:400;margin-left:6px}',
-      '.bv-sku-meta{font-size:12px;color:#64748b;margin-top:2px}',
+      /* SKU table */
+      '.bv-sku-table{width:100%;border-collapse:collapse;font-size:12px;min-width:700px}',
+      '.bv-sku-table th{background:#f8fafc;font-weight:600;color:#374151;padding:8px 10px;text-align:left;border-bottom:2px solid #e2e8f0;white-space:nowrap}',
+      '.bv-sku-table td{padding:7px 10px;border-bottom:1px solid #f1f5f9;vertical-align:middle}',
+      '.bv-sku-table tbody tr:hover{background:#f8fafc}',
+      '.bv-sku-img{width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid #e2e8f0}',
+      '.bv-img-ph{width:40px;height:40px;background:#f1f5f9;border-radius:4px;border:1px dashed #cbd5e1;display:flex;align-items:center;justify-content:center;font-size:10px;color:#94a3b8;text-align:center;line-height:1.2}',
+      '.bv-code-tag{font-size:11px;color:#1e40af;font-family:monospace;background:#eff6ff;padding:2px 5px;border-radius:3px;white-space:nowrap}',
+      '.bv-sku-namecell{max-width:200px}',
+      '.bv-spec-cell{font-size:11px;color:#64748b;max-width:150px}',
+      '.bv-plat-btn{color:#fff;background:#0284c7;padding:2px 8px;border-radius:4px;font-size:11px;text-decoration:none;white-space:nowrap}',
+      '.bv-plat-btn:hover{background:#0369a1}',
+      '.bv-nodim{color:#cbd5e1}',
+      '.bv-tc{text-align:center}',
+      '.bv-tr{text-align:right}',
       '.bv-table{width:100%;border-collapse:collapse;font-size:13px}',
       '.bv-table th,.bv-table td{padding:9px 12px;border-bottom:1px solid #f1f5f9;text-align:left}',
       '.bv-table th{background:#f8fafc;font-weight:600;color:#374151}',
